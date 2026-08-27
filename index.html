@@ -109,6 +109,12 @@
     </button>
   </div>
   <div class="row-list">
+    <button type="button" class="form-row" data-set="sync">
+      <span class="ric">☁️</span><span class="rlab">雲端同步</span>
+      <span class="rval" id="setSyncVal"></span><span class="chev">›</span>
+    </button>
+  </div>
+  <div class="row-list">
     <button type="button" class="form-row" data-set="export">
       <span class="ric">📤</span><span class="rlab">匯出資料</span>
       <span class="rval"></span><span class="chev">›</span>
@@ -322,6 +328,12 @@
   </div>
 </dialog>
 
+<!-- 雲端同步 -->
+<dialog id="dlgSync" class="dialog">
+  <h2 class="dialog-title">雲端即時同步</h2>
+  <div id="syncBody"></div>
+</dialog>
+
 <!-- 日期選擇器 -->
 <dialog id="dlgDate" class="dialog sheet">
   <div class="dp-head">
@@ -369,6 +381,8 @@
 
 <div id="toast" class="toast" hidden></div>
 
+<script src="firebase-config.js"></script>
 <script src="app.js"></script>
+<script type="module" src="sync.js"></script>
 </body>
 </html>

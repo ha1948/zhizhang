@@ -1,10 +1,12 @@
 /* 智賬 service worker */
-const CACHE = 'zhizhang-v7';
+const CACHE = 'zhizhang-v8';
 const ASSETS = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './firebase-config.js',
+  './sync.js',
   './manifest.json',
   './icon.svg',
   './icon-192.png',

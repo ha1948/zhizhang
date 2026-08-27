@@ -476,6 +476,13 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 
 .range-quick { display: flex; flex-direction: column; gap: 8px; }
 
+.sync-code {
+  text-align: center; font-size: 28px; font-weight: 800; letter-spacing: 4px;
+  background: var(--accent-soft); color: var(--accent);
+  border-radius: var(--radius); padding: 16px 8px; margin: 12px 0;
+  font-variant-numeric: tabular-nums; user-select: all;
+}
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; left: 50%; bottom: calc(94px + env(safe-area-inset-bottom));

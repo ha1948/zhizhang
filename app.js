@@ -57,7 +57,13 @@ function migrate(d) {
 function save() { localStorage.setItem(LS_KEY, JSON.stringify(db)); }
 
 let db = load();
+window.db = db; // 供 sync.js 模組存取（db 不會被重新賦值）
 const cats = (type) => db.categories[type] || [];
+
+/* 雲端同步掛鉤（sync.js 未載入或未連線時皆為 no-op） */
+const syncUpsert = (tx) => { try { window.Sync?.upsertTx(tx); } catch (e) { /* 離線時忽略 */ } };
+const syncDelete = (id) => { try { window.Sync?.deleteTx(id); } catch (e) { /* 離線時忽略 */ } };
+const syncConfig = () => { try { window.Sync?.saveConfig(); } catch (e) { /* 離線時忽略 */ } };
 
 /* ---------- 小工具 ---------- */
 const $ = (sel) => document.querySelector(sel);
@@ -527,6 +533,8 @@ function saveTx(keepOpen) {
   }
   if (feeTx) db.txs.push(feeTx);
   save();
+  syncUpsert(base);
+  if (feeTx) syncUpsert(feeTx);
   renderCurrentView();
 
   if (keepOpen) {
@@ -871,12 +879,14 @@ function doSettle(debtor) {
   const creditor = debtor === 'p1' ? 'p2' : 'p1';
   const amt = Math.abs(balances()[debtor]);
   if (amt < 0.01) return;
-  db.txs.push({
+  const tx = {
     id: uid(), type: 'transfer', amount: amt,
     from: debtor, to: creditor,
     date: today(), note: '結清', createdAt: Date.now(),
-  });
+  };
+  db.txs.push(tx);
   save();
+  syncUpsert(tx);
   toast(`已結清：${db.members[debtor]} 轉給 ${db.members[creditor]} ${fmt(amt)}`);
   renderCurrentView();
 }
@@ -889,6 +899,39 @@ let editingCatId = null;
 
 function renderSettings() {
   $('#setMembersVal').textContent = `${db.members.p1}、${db.members.p2}`;
+  const S = window.Sync;
+  $('#setSyncVal').textContent = !S || !S.configured ? '未啟用' : (S.enabled ? '已連線 ✓' : '未連線');
+}
+
+function renderSyncDialog() {
+  const S = window.Sync;
+  const body = $('#syncBody');
+  if (!S || !S.configured) {
+    body.innerHTML = `
+      <p class="hint" style="margin-top:0">雲端同步尚未啟用（需要設定 Firebase 金鑰）。啟用後兩支手機可即時看到彼此的記錄。</p>
+      <div class="dialog-actions"><button class="btn btn-primary btn-block" id="btnSyncClose">知道了</button></div>`;
+  } else if (S.enabled) {
+    body.innerHTML = `
+      <p class="hint" style="margin-top:0">已連線共享帳本，兩邊記錄即時同步。</p>
+      <div class="sync-code">${esc(S.roomId)}</div>
+      <p class="hint">另一半在他手機的「雲端同步 → 加入帳本」輸入這組配對碼即可。</p>
+      <div class="dialog-actions">
+        <button class="btn btn-danger" id="btnSyncOff">中斷同步</button>
+        <button class="btn btn-primary" id="btnSyncClose">完成</button>
+      </div>`;
+  } else {
+    body.innerHTML = `
+      <p class="hint" style="margin-top:0">建立一本共享帳本，或輸入另一半給你的配對碼加入。加入時兩邊既有記錄會自動合併。</p>
+      <button class="btn btn-primary btn-block" id="btnSyncCreate" style="margin-bottom:14px">建立共享帳本</button>
+      <div class="field" style="margin-bottom:10px">
+        <label class="field-label" for="inpSyncCode">加入帳本 — 輸入配對碼</label>
+        <input id="inpSyncCode" class="input" maxlength="12" placeholder="例：AB12CD34" autocapitalize="characters" autocomplete="off">
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" id="btnSyncClose">取消</button>
+        <button class="btn btn-primary" id="btnSyncJoin">加入</button>
+      </div>`;
+  }
 }
 
 function renderCatTiles() {
@@ -930,6 +973,7 @@ function saveCatEdit() {
     if (c) { c.name = name; c.icon = icon; }
   }
   save();
+  syncConfig();
   $('#dlgCatEdit').close();
   renderCatTiles();
   toast('已儲存類別');
@@ -946,6 +990,7 @@ function deleteCat() {
   if (!window.confirm(msg)) return;
   db.categories[catPageType] = cats(catPageType).filter((x) => x.id !== id);
   save();
+  syncConfig();
   $('#dlgCatEdit').close();
   renderCatTiles();
   toast('已刪除類別');
@@ -995,6 +1040,8 @@ function importData(file) {
       if (d.categories && Array.isArray(d.categories.expense)) db.categories = d.categories;
       migrate(db);
       save();
+      db.txs.forEach(syncUpsert);
+      syncConfig();
       renderCurrentView();
       toast(`匯入完成，共 ${db.txs.length} 筆`);
     } catch (e) { toast('檔案格式不正確'); }
@@ -1202,6 +1249,7 @@ function bind() {
     const id = $('#dlgTxAction').dataset.id;
     db.txs = db.txs.filter((t) => t.id !== id);
     save();
+    syncDelete(id);
     $('#dlgTxAction').close();
     toast('已刪除');
     renderCurrentView();
@@ -1298,14 +1346,53 @@ function bind() {
       catPageType = 'expense';
       renderCatTiles();
       $('#catPage').hidden = false;
+    } else if (kind === 'sync') {
+      renderSyncDialog();
+      $('#dlgSync').showModal();
     } else if (kind === 'export') exportData();
     else if (kind === 'import') $('#fileImport').click();
+  });
+
+  // 雲端同步彈窗
+  $('#dlgSync').addEventListener('click', async (e) => {
+    const S = window.Sync;
+    if (e.target.closest('#btnSyncClose')) { $('#dlgSync').close(); return; }
+    if (e.target.closest('#btnSyncCreate')) {
+      try {
+        toast('建立中⋯');
+        await S.create();
+        renderSyncDialog();
+        renderSettings();
+        toast('共享帳本已建立');
+      } catch (err) { toast('建立失敗：' + err.message); }
+      return;
+    }
+    if (e.target.closest('#btnSyncJoin')) {
+      const code = $('#inpSyncCode')?.value || '';
+      if (!code.trim()) { toast('請輸入配對碼'); return; }
+      try {
+        toast('連線中⋯');
+        await S.join(code);
+        renderSyncDialog();
+        renderSettings();
+        renderCurrentView();
+        toast('已加入共享帳本');
+      } catch (err) { toast('加入失敗：' + err.message); }
+      return;
+    }
+    if (e.target.closest('#btnSyncOff')) {
+      S.disconnect();
+      renderSyncDialog();
+      renderSettings();
+      toast('已中斷同步（本機資料保留）');
+    }
   });
   $('#btnMembersCancel').addEventListener('click', () => $('#dlgMembers').close());
   $('#btnMembersSave').addEventListener('click', () => {
     db.members.p1 = $('#inpName1').value.trim() || '我';
     db.members.p2 = $('#inpName2').value.trim() || '另一半';
     save();
+    syncConfig();
     $('#dlgMembers').close();
     toast('已儲存名稱');
     renderCurrentView();
