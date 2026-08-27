@@ -36,18 +36,20 @@ function ensureInit() {
   }
 }
 
-async function uploadLocal(id) {
+async function uploadLocal(id, { withConfig = true } = {}) {
   const txs = window.db.txs;
   for (let i = 0; i < txs.length; i += 400) {
     const batch = writeBatch(fs);
     txs.slice(i, i + 400).forEach((t) => batch.set(doc(fs, 'rooms', id, 'txs', t.id), t));
     await batch.commit();
   }
-  await setDoc(doc(fs, 'rooms', id, 'meta', 'config'), {
-    members: window.db.members,
-    categories: window.db.categories,
-    updatedAt: Date.now(),
-  }, { merge: true });
+  if (withConfig) {
+    await setDoc(doc(fs, 'rooms', id, 'meta', 'config'), {
+      members: window.db.members,
+      categories: window.db.categories,
+      updatedAt: Date.now(),
+    }, { merge: true });
+  }
 }
 
 function listen(id) {
@@ -82,10 +84,10 @@ function listen(id) {
   }, (err) => console.warn('sync config listener:', err)));
 }
 
-async function connect(id, { upload = false } = {}) {
+async function connect(id, { upload = false, withConfig = true } = {}) {
   ensureInit();
   roomId = id;
-  if (upload) await uploadLocal(id);
+  if (upload) await uploadLocal(id, { withConfig });
   listen(id);
   started = true;
   setState({ roomId: id });
@@ -104,7 +106,8 @@ window.Sync = {
   async join(code) {
     const id = String(code).trim().toUpperCase();
     if (id.length < 6) throw new Error('配對碼格式不正確');
-    await connect(id, { upload: true }); // 上傳本機既有記錄 → 兩邊自動合併
+    // 上傳本機既有記錄合併，但成員/類別設定以雲端（建立方）為準
+    await connect(id, { upload: true, withConfig: false });
     return id;
   },
   upsertTx(t) {
