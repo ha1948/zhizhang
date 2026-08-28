@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v16';
+const APP_VER = 'v17';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
