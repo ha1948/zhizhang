@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v19';
+const APP_VER = 'v20';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -92,9 +92,6 @@ const STR = {
     loginDone: '登入成功', loginFail: '登入失敗：{e}', signupDone: '帳號已建立並登入',
     enterEmailPw: '請輸入 Email 與密碼', pwTooShort: '密碼至少 6 碼',
     signedOut: '已登出',
-    verifyHint: '驗證信已寄到 {email}。請到信箱點擊驗證連結，完成後回來按「重新檢查」。',
-    recheck: '我完成了，重新檢查', resend: '重寄驗證信', verifyResent: '驗證信已重寄',
-    stillNotVerified: '尚未偵測到驗證完成，請確認已點擊信中連結',
     waitingApprove: '已向帳本 {code} 送出加入申請，等待該帳本建立者同意⋯',
     reqTitle: '加入申請', approve: '同意', rejectBtn: '拒絕', blockBtn: '封鎖',
     approvedToast: '已同意 {email} 加入', rejectedToast: '已拒絕申請',
@@ -167,9 +164,6 @@ const STR = {
     loginDone: 'Signed in', loginFail: 'Sign-in failed: {e}', signupDone: 'Account created & signed in',
     enterEmailPw: 'Enter email and password', pwTooShort: 'Password must be 6+ characters',
     signedOut: 'Signed out',
-    verifyHint: 'A verification email was sent to {email}. Click the link inside, then come back and press "Check again".',
-    recheck: 'Done — check again', resend: 'Resend email', verifyResent: 'Verification email resent',
-    stillNotVerified: 'Not verified yet — make sure you clicked the link',
     waitingApprove: 'Join request sent to book {code} — waiting for its owner to approve…',
     reqTitle: 'Join requests', approve: 'Approve', rejectBtn: 'Reject', blockBtn: 'Block',
     approvedToast: 'Approved {email}', rejectedToast: 'Request rejected',
@@ -1220,7 +1214,6 @@ function renderSettings() {
   else if (!S.signedIn) st = L('syncOffline');
   else if (S.enabled) st = L('syncOn');
   else if (S.pending) st = L('syncPendingApprove');
-  else if (!S.emailVerified) st = L('syncPendingVerify');
   else st = L('syncOffline');
   $('#setSyncVal').textContent = st;
   $('#verLabel').textContent = '智賬 ' + APP_VER;
@@ -1270,16 +1263,6 @@ function renderSyncDialog() {
       <div class="sync-code">${esc(S.pendingCode || '')}</div>
       <div class="dialog-actions">
         <button class="btn btn-ghost" id="btnSyncCancelReq">${L('cancelReq')}</button>
-        <button class="btn btn-ghost" id="btnSyncLogout">${L('signOut')}</button>
-      </div>`;
-  } else if (!S.enabled && !S.emailVerified) {
-    body.innerHTML = `
-      <p class="hint" style="margin-top:0">${L('verifyHint', { email: esc(S.userEmail || '') })}</p>
-      <div class="dialog-actions">
-        <button class="btn btn-primary btn-block" id="btnSyncRecheck">${L('recheck')}</button>
-      </div>
-      <div class="dialog-actions">
-        <button class="btn btn-ghost" id="btnSyncResend">${L('resend')}</button>
         <button class="btn btn-ghost" id="btnSyncLogout">${L('signOut')}</button>
       </div>`;
   } else if (S.enabled) {
@@ -1959,19 +1942,6 @@ function bind() {
       renderSyncDialog();
       renderSettings();
       toast(L('signedOut'));
-      return;
-    }
-    if (e.target.closest('#btnSyncRecheck')) {
-      toast(L('connecting'));
-      await S.recheck();
-      renderSyncDialog();
-      renderSettings();
-      if (S.signedIn && !S.emailVerified) toast(L('stillNotVerified'));
-      return;
-    }
-    if (e.target.closest('#btnSyncResend')) {
-      try { await S.resendVerification(); toast(L('verifyResent')); }
-      catch (err) { toast(L('loginFail', { e: (err.code || '').replace('auth/', '') })); }
       return;
     }
     const ap = e.target.closest('[data-approve]');

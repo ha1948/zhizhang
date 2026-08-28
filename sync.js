@@ -12,7 +12,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
-  createUserWithEmailAndPassword, signOut, sendEmailVerification,
+  createUserWithEmailAndPassword, signOut,
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 
 const cfg = window.FIREBASE_CONFIG;
@@ -238,10 +238,6 @@ window.Sync = {
   async signUp(email, pw) {
     ensureInit();
     await createUserWithEmailAndPassword(auth, email, pw);
-    try { await sendEmailVerification(auth.currentUser); } catch (e) { console.warn(e); }
-  },
-  async resendVerification() {
-    if (auth?.currentUser) await sendEmailVerification(auth.currentUser);
   },
   async recheck() { await onAuth(auth?.currentUser || null); },
   async signOutUser() {
