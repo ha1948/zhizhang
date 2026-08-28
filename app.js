@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v18';
+const APP_VER = 'v19';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -100,6 +100,7 @@ const STR = {
     approvedToast: '已同意 {email} 加入', rejectedToast: '已拒絕申請',
     blockedToast: '已封鎖 {email}', cancelReq: '取消申請', reqCancelled: '已取消申請',
     roomNotFound: '配對碼不存在，請確認後再試',
+    createNotAllowed: '此站僅限站主建立帳本，請輸入配對碼加入；想自架請 fork 程式碼並換上自己的 Firebase 金鑰',
     syncPendingVerify: '待驗證', syncPendingApprove: '待同意',
     reqIncoming: '{email} 申請加入你的資料庫：',
   },
@@ -174,6 +175,7 @@ const STR = {
     approvedToast: 'Approved {email}', rejectedToast: 'Request rejected',
     blockedToast: 'Blocked {email}', cancelReq: 'Cancel request', reqCancelled: 'Request cancelled',
     roomNotFound: 'Pairing code not found — please check and retry',
+    createNotAllowed: 'Only the site owner can create books here. Join with a pairing code, or fork the code with your own Firebase key.',
     syncPendingVerify: 'Verify email', syncPendingApprove: 'Awaiting approval',
     reqIncoming: '{email} requests access to your database:',
   },
@@ -1994,7 +1996,9 @@ function bind() {
         renderSyncDialog();
         renderSettings();
         toast(L('bookCreated'));
-      } catch (err) { toast(L('createFail', { e: err.message })); }
+      } catch (err) {
+        toast(String(err.code || '').includes('permission-denied') ? L('createNotAllowed') : L('createFail', { e: err.message }));
+      }
       return;
     }
     if (e.target.closest('#btnSyncJoin')) {
