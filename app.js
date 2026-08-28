@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v13';
+const APP_VER = 'v14';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -1172,9 +1172,9 @@ function renderSettings() {
   let st;
   if (!S || !S.configured) st = L('syncNA');
   else if (!S.signedIn) st = L('syncOffline');
+  else if (S.allowed) st = S.enabled ? L('syncOn') : L('syncOffline');
   else if (!S.emailVerified) st = L('syncPendingVerify');
-  else if (!S.allowed) st = L('syncPendingApprove');
-  else st = S.enabled ? L('syncOn') : L('syncOffline');
+  else st = L('syncPendingApprove');
   $('#setSyncVal').textContent = st;
   $('#verLabel').textContent = '智賬 ' + APP_VER;
 }
@@ -1216,7 +1216,7 @@ function renderSyncDialog() {
       <div class="dialog-actions">
         <button class="btn btn-ghost btn-block" id="btnSyncSignup">${L('signUp')}</button>
       </div>`;
-  } else if (!S.emailVerified) {
+  } else if (!S.allowed && !S.emailVerified) {
     body.innerHTML = `
       <p class="hint" style="margin-top:0">${L('verifyHint', { email: esc(S.userEmail || '') })}</p>
       <div class="dialog-actions">

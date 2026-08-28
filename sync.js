@@ -159,10 +159,10 @@ async function refreshAccess() {
   if (!user) { aclReady = true; notify(); return; }
   try { await user.reload(); } catch (e) { /* 離線忽略 */ }
   user = auth.currentUser;
-  if (!user || !user.emailVerified) { aclReady = true; notify(); return; }
+  if (!user) { aclReady = true; notify(); return; }
   try { await user.getIdToken(true); } catch (e) { /* 忽略 */ }
 
-  // 建立者可讀 /requests 清單；非建立者會被規則擋下
+  // 先檢查是否為建立者（建立者不需 email 驗證；可讀 /requests 清單，非建立者會被規則擋下）
   try {
     await getDocs(collection(fs, 'requests'));
     owner = true;
@@ -171,6 +171,11 @@ async function refreshAccess() {
   if (owner) {
     allowed = true;
     watchRequests();
+  } else if (!user.emailVerified) {
+    // 非建立者需先完成 email 驗證
+    aclReady = true;
+    notify();
+    return;
   } else {
     try {
       const s = await getDoc(doc(fs, 'allow', user.email));
