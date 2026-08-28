@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v20';
+const APP_VER = 'v21';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -1219,6 +1219,17 @@ function renderSettings() {
   $('#verLabel').textContent = '智賬 ' + APP_VER;
 }
 
+function syncNotice(msg) {
+  const body = $('#syncBody');
+  let n = body.querySelector('.sync-notice');
+  if (!n) {
+    n = document.createElement('p');
+    n.className = 'sync-notice';
+    body.prepend(n);
+  }
+  n.textContent = msg;
+}
+
 function syncReqBlock(S) {
   if (!S.isOwner || !S.requests.length) return '';
   return `<div class="card-flat" style="margin-bottom:14px">
@@ -1967,13 +1978,13 @@ function bind() {
         renderSettings();
         toast(L('bookCreated'));
       } catch (err) {
-        toast(String(err.code || '').includes('permission-denied') ? L('createNotAllowed') : L('createFail', { e: err.message }));
+        syncNotice(String(err.code || '').includes('permission-denied') ? L('createNotAllowed') : L('createFail', { e: err.message }));
       }
       return;
     }
     if (e.target.closest('#btnSyncJoin')) {
       const code = $('#inpSyncCode')?.value || '';
-      if (!code.trim()) { toast(L('enterCode')); return; }
+      if (!code.trim()) { syncNotice(L('enterCode')); return; }
       try {
         toast(L('connecting'));
         const res = await S.join(code);
@@ -1982,7 +1993,7 @@ function bind() {
         renderCurrentView();
         if (!res || !res.pending) toast(L('bookJoined'));
       } catch (err) {
-        toast(err.code === 'room-not-found' ? L('roomNotFound') : L('joinFail', { e: err.message }));
+        syncNotice(err.code === 'room-not-found' ? L('roomNotFound') : L('joinFail', { e: err.message }));
       }
       return;
     }
