@@ -1,6 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
+const APP_VER = 'v13';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -67,7 +68,9 @@ const STR = {
     catSaved: '已儲存類別', catDeleted: '已刪除類別', catNameReq: '請輸入類別名稱',
     catDelUsed: '有 {n} 筆記錄使用「{name}」，刪除後這些記錄會顯示為「其他」。確定刪除？',
     catDelConfirm: '確定刪除「{name}」？',
-    catHint: '點選類別即可編輯名稱與 emoji、排序，或刪除',
+    catHint: '點類別可編輯名稱與 emoji；點右上「編輯」可刪除與拖曳排序',
+    catHintEdit: '點「−」刪除類別；按住類別拖曳可調整順序',
+    edit: '編輯',
     rangeTitle: '日期範圍', last7: '最近 7 天', last30: '最近 30 天', last90: '最近 90 天',
     allTimeRange: '全部期間', start: '開始', end: '結束', apply: '套用', rangeBad: '請選擇正確的日期範圍',
     syncTitle: '雲端即時同步', syncOn: '已連線 ✓', syncOffline: '未連線', syncNA: '未啟用',
@@ -137,7 +140,9 @@ const STR = {
     catSaved: 'Category saved', catDeleted: 'Category deleted', catNameReq: 'Enter a category name',
     catDelUsed: '{n} records use "{name}". They will show as "Other". Delete?',
     catDelConfirm: 'Delete "{name}"?',
-    catHint: 'Tap a category to edit its name, emoji, order — or delete it',
+    catHint: 'Tap a category to edit its name & emoji. Use "Edit" (top right) to delete or reorder',
+    catHintEdit: 'Tap "−" to delete; press and drag a tile to reorder',
+    edit: 'Edit',
     rangeTitle: 'Date range', last7: 'Last 7 days', last30: 'Last 30 days', last90: 'Last 90 days',
     allTimeRange: 'All time', start: 'Start', end: 'End', apply: 'Apply', rangeBad: 'Pick a valid range',
     syncTitle: 'Real-time cloud sync', syncOn: 'Connected ✓', syncOffline: 'Not connected', syncNA: 'Not set up',
@@ -1171,6 +1176,7 @@ function renderSettings() {
   else if (!S.allowed) st = L('syncPendingApprove');
   else st = S.enabled ? L('syncOn') : L('syncOffline');
   $('#setSyncVal').textContent = st;
+  $('#verLabel').textContent = '智賬 ' + APP_VER;
 }
 
 function syncReqBlock(S) {
@@ -1260,22 +1266,28 @@ function renderSyncDialog() {
   }
 }
 
+let catEditMode = false;
+
 function renderCatTiles() {
   $$('#segCatType .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.type === catPageType));
-  $('#catTiles').innerHTML = cats(catPageType).map((c) => `
+  $('#btnCatEditMode').textContent = catEditMode ? L('done') : L('edit');
+  $('#catHintText').textContent = catEditMode ? L('catHintEdit') : L('catHint');
+  const box = $('#catTiles');
+  box.classList.toggle('editing', catEditMode);
+  box.innerHTML = cats(catPageType).map((c) => `
     <button type="button" class="cat-tile" data-cat="${c.id}">
+      ${catEditMode ? `<span class="cat-minus" data-del="${c.id}">−</span>` : ''}
       <span class="em">${c.icon}</span><span class="nm">${esc(c.name)}</span>
-    </button>`).join('') + `
+    </button>`).join('') + (catEditMode ? '' : `
     <button type="button" class="cat-tile add-tile" data-cat="__new">
       <span class="em">＋</span><span class="nm">${L('add')}</span>
-    </button>`;
+    </button>`);
 }
 
 function openCatEdit(id) {
   editingCatId = id;
   const isNew = id === '__new';
   $('#catEditTitle').textContent = isNew ? L('catEditNew') : L('catEdit');
-  $('#btnCatDelete').hidden = isNew;
   if (isNew) {
     $('#inpCatEmoji').value = '';
     $('#inpCatName').value = '';
@@ -1288,12 +1300,12 @@ function openCatEdit(id) {
   $('#dlgCatEdit').showModal();
 }
 
-/* ----- 類別拖拉排序（長按 250ms 後拖曳） ----- */
-let cdTile = null, cdGhost = null, cdTimer = null, cdDragging = false, cdOffX = 0, cdOffY = 0, cdSuppressClick = false;
+/* ----- 類別拖拉排序（編輯模式中直接拖曳） ----- */
+let cdTile = null, cdGhost = null, cdDragging = false, cdOffX = 0, cdOffY = 0;
+let cdStartX = 0, cdStartY = 0, cdSuppressUntil = 0;
 
 function cdStart(tile, touch) {
   cdDragging = true;
-  cdSuppressClick = true;
   const r = tile.getBoundingClientRect();
   cdGhost = tile.cloneNode(true);
   cdGhost.classList.add('cat-ghost');
@@ -1323,6 +1335,7 @@ function cdEnd() {
   cdGhost = null;
   if (cdTile) cdTile.classList.remove('drag-src');
   if (cdDragging) {
+    cdSuppressUntil = Date.now() + 400; // 拖曳剛結束，吞掉緊接著的誤觸點擊
     const order = [...document.querySelectorAll('#catTiles .cat-tile:not(.add-tile)')].map((t) => t.dataset.cat);
     db.categories[catPageType].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
     save();
@@ -1334,32 +1347,27 @@ function cdEnd() {
 function bindCatDrag() {
   const box = $('#catTiles');
   box.addEventListener('touchstart', (e) => {
+    if (!catEditMode) return;
+    if (e.target.closest('.cat-minus')) return; // 按 − 是刪除，不拖曳
     const tile = e.target.closest('.cat-tile:not(.add-tile)');
     if (!tile) return;
     cdTile = tile;
-    cdSuppressClick = false;
-    const t = e.touches[0];
-    const sx = t.clientX, sy = t.clientY;
-    cdTimer = setTimeout(() => { if (cdTile) cdStart(cdTile, { clientX: sx, clientY: sy }); }, 250);
+    cdStartX = e.touches[0].clientX;
+    cdStartY = e.touches[0].clientY;
   }, { passive: true });
   box.addEventListener('touchmove', (e) => {
     if (!cdTile) return;
+    const t = e.touches[0];
     if (!cdDragging) {
-      clearTimeout(cdTimer); // 開始捲動 → 取消長按
-      cdTile = null;
-      return;
+      const dist = Math.hypot(t.clientX - cdStartX, t.clientY - cdStartY);
+      if (dist < 6) return; // 容許手指微晃
+      cdStart(cdTile, t);
     }
     e.preventDefault();
-    cdMove(e.touches[0]);
+    cdMove(t);
   }, { passive: false });
-  box.addEventListener('touchend', () => {
-    clearTimeout(cdTimer);
-    cdEnd();
-  });
-  box.addEventListener('touchcancel', () => {
-    clearTimeout(cdTimer);
-    cdEnd();
-  });
+  box.addEventListener('touchend', cdEnd);
+  box.addEventListener('touchcancel', cdEnd);
 }
 
 function saveCatEdit() {
@@ -1379,17 +1387,21 @@ function saveCatEdit() {
   toast(L('catSaved'));
 }
 
-function deleteCat() {
-  const id = editingCatId;
-  if (!id || id === '__new') return;
+function openCatDelConfirm(id) {
   const used = db.txs.filter((t) => t.type === catPageType && t.category === id).length;
   const c = cats(catPageType).find((x) => x.id === id);
-  const msg = used > 0 ? L('catDelUsed', { n: used, name: c?.name }) : L('catDelConfirm', { name: c?.name });
-  if (!window.confirm(msg)) return;
+  if (!c) return;
+  $('#catDelDesc').textContent = used > 0
+    ? L('catDelUsed', { n: used, name: c.name })
+    : L('catDelConfirm', { name: c.name });
+  const dlg = $('#dlgCatDel');
+  dlg.dataset.id = id;
+  dlg.showModal();
+}
+function deleteCat(id) {
   db.categories[catPageType] = cats(catPageType).filter((x) => x.id !== id);
   save();
   syncConfig();
-  $('#dlgCatEdit').close();
   renderCatTiles();
   toast(L('catDeleted'));
 }
@@ -1894,20 +1906,29 @@ function bind() {
   });
 
   // 類別管理
-  $('#btnCatClose').addEventListener('click', () => { $('#catPage').hidden = true; lockScroll(); });
+  $('#btnCatClose').addEventListener('click', () => { catEditMode = false; $('#catPage').hidden = true; lockScroll(); });
+  $('#btnCatEditMode').addEventListener('click', () => { catEditMode = !catEditMode; renderCatTiles(); });
   $('#segCatType').addEventListener('click', (e) => {
     const b = e.target.closest('.seg-btn'); if (!b) return;
     catPageType = b.dataset.type;
     renderCatTiles();
   });
   $('#catTiles').addEventListener('click', (e) => {
-    if (cdSuppressClick) { cdSuppressClick = false; return; } // 拖曳結束，不觸發編輯
+    if (Date.now() < cdSuppressUntil) return; // 拖曳剛結束，不觸發點擊
+    const minus = e.target.closest('.cat-minus');
+    if (minus) { openCatDelConfirm(minus.dataset.del); return; }
+    if (catEditMode) return; // 編輯模式下點磚不動作
     const tile = e.target.closest('.cat-tile'); if (!tile) return;
     openCatEdit(tile.dataset.cat);
   });
   bindCatDrag();
   $('#btnCatSave').addEventListener('click', saveCatEdit);
-  $('#btnCatDelete').addEventListener('click', deleteCat);
+  $('#btnCatDelCancel').addEventListener('click', () => $('#dlgCatDel').close());
+  $('#btnCatDelOk').addEventListener('click', () => {
+    const id = $('#dlgCatDel').dataset.id;
+    $('#dlgCatDel').close();
+    deleteCat(id);
+  });
 }
 
 /* ---------- 啟動 ---------- */
@@ -1920,4 +1941,11 @@ window.onSyncChanged = () => { if ($('#dlgSync').open) renderSyncDialog(); };
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
+  // 新版 service worker 接手時自動重新載入，讓更新在重開一次後即生效
+  let swReloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (swReloaded || !navigator.serviceWorker.controller) return;
+    swReloaded = true;
+    location.reload();
+  });
 }

@@ -126,6 +126,7 @@
     <input id="fileImport" type="file" accept="application/json" hidden>
   </div>
   <p class="hint" data-i18n="settingsHint">資料儲存在這台裝置的瀏覽器中，可用「匯出／匯入」在兩台手機之間同步（依 id 合併去重）。</p>
+  <p class="hint" style="text-align:center" id="verLabel"></p>
 </section>
 
 </main>
@@ -247,13 +248,23 @@
       <button class="seg-btn active" data-type="expense" data-i18n="expense">支出</button>
       <button class="seg-btn" data-type="income" data-i18n="income">收入</button>
     </div>
-    <span class="head-spacer"></span>
+    <button id="btnCatEditMode" class="btn btn-ghost btn-sm" data-i18n="edit">編輯</button>
   </div>
   <div class="add-body">
     <div class="cat-tiles" id="catTiles"></div>
-    <p class="hint" style="text-align:center" data-i18n="catHint">點類別可編輯或刪除；長按拖曳即可排序</p>
+    <p class="hint" style="text-align:center" id="catHintText"></p>
   </div>
 </div>
+
+<!-- 類別刪除確認 -->
+<dialog id="dlgCatDel" class="dialog">
+  <h2 class="dialog-title" data-i18n="confirmDelTitle">確定要刪除嗎？</h2>
+  <p class="hint" id="catDelDesc" style="margin-top:0"></p>
+  <div class="dialog-actions">
+    <button id="btnCatDelCancel" class="btn btn-ghost" data-i18n="cancel">取消</button>
+    <button id="btnCatDelOk" class="btn btn-danger" data-i18n="delete">刪除</button>
+  </div>
+</dialog>
 
 <!-- ============ Reports 明細（整頁覆蓋） ============ -->
 <div id="repDetailPage" class="add-page" hidden>
@@ -283,8 +294,7 @@
     </div>
   </div>
   <div class="dialog-actions">
-    <button id="btnCatDelete" class="btn btn-danger" data-i18n="delete">刪除</button>
-    <button id="btnCatSave" class="btn btn-primary" data-i18n="save">儲存</button>
+    <button id="btnCatSave" class="btn btn-primary btn-block" data-i18n="save">儲存</button>
   </div>
 </dialog>
 
