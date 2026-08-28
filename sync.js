@@ -1,15 +1,14 @@
-/* ================= 智賬 — 雲端即時同步（Firebase Firestore + Auth 白名單） =================
-   安全模型：
-   - Firestore 規則要求「已登入 + email 已驗證 + （是建立者 或 在 /allow 白名單中）」
-   - 建立者身分寫死在規則裡（不出現在公開程式碼中）
-   - 新成員登入後自動送出加入申請（/requests），建立者在 App 內點「同意」寫入 /allow
-   陌生人拿到網址與程式碼也無法讀寫資料庫。
+/* ================= 智賬 — 雲端即時同步（多帳本模式） =================
+   模型：每本共享帳本（room）有自己的建立者（owner）與成員名單（members）。
+   - 任何已驗證的登入者都可建立自己的帳本，成為該帳本的建立者
+   - 憑配對碼申請加入某本帳，由該帳本的建立者在 App 內同意／拒絕／封鎖
+   - Firestore 規則以帳本根文件的 owner / members / blocked 判斷權限
    此檔為 ES module；離線或未設定 FIREBASE_CONFIG 時載入失敗不影響主程式。 */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
-  doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch, getDoc, getDocs,
+  doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch, getDoc,
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword,
@@ -22,16 +21,16 @@ const LSK = 'zhizhang.sync';
 let fs = null;
 let auth = null;
 let user = null;
-let roomId = null;
-let unsubs = [];
-let started = false;
 
-let allowed = false;
-let owner = false;
-let aclReady = false;
+let roomId = null;        // 已連線的帳本
+let roomOwner = null;     // 該帳本建立者 email
+let started = false;
+let unsubs = [];          // txs / config 監聽
+let reqUnsub = null;      // （建立者）加入申請監聽
 let requests = [];
-let reqUnsub = null;
-let allowUnsub = null;
+
+let pendingRoomId = null; // 申請中、等待同意的帳本
+let pendingUnsub = null;
 
 const getState = () => { try { return JSON.parse(localStorage.getItem(LSK)) || {}; } catch (e) { return {}; } };
 const setState = (s) => localStorage.setItem(LSK, JSON.stringify(s));
@@ -59,6 +58,13 @@ function notify() {
   window.onSyncChanged?.();
 }
 
+function err(code, msg) {
+  const e = new Error(msg);
+  e.code = code;
+  return e;
+}
+
+/* ---------- 資料上傳 / 監聽 ---------- */
 async function uploadLocal(id, { withConfig = true } = {}) {
   const txs = window.db.txs;
   for (let i = 0; i < txs.length; i += 400) {
@@ -85,13 +91,19 @@ function listen(id) {
       } else {
         const t = ch.doc.data();
         const i = window.db.txs.findIndex((x) => x.id === ch.doc.id);
-        if (i >= 0) {
-          if (JSON.stringify(window.db.txs[i]) !== JSON.stringify(t)) { window.db.txs[i] = t; changed = true; }
-        } else { window.db.txs.push(t); changed = true; }
+        if (i < 0) { window.db.txs.push(t); changed = true; }
+        else if (JSON.stringify(window.db.txs[i]) !== JSON.stringify(t)) {
+          // 衝突解法：比較更新時間，較新的版本獲勝
+          const local = window.db.txs[i];
+          const tIn = t.updatedAt || t.createdAt || 0;
+          const tLoc = local.updatedAt || local.createdAt || 0;
+          if (tIn >= tLoc) { window.db.txs[i] = t; changed = true; }
+          else setDoc(doc(fs, 'rooms', id, 'txs', local.id), local).catch(() => {});
+        }
       }
     });
     if (changed) { window.save(); window.renderCurrentView(); }
-  }, (err) => console.warn('sync txs listener:', err)));
+  }, (e) => console.warn('sync txs listener:', e)));
 
   unsubs.push(onSnapshot(doc(fs, 'rooms', id, 'meta', 'config'), (snap) => {
     const d = snap.data();
@@ -104,109 +116,119 @@ function listen(id) {
       window.save();
       window.renderCurrentView();
     }
-  }, (err) => console.warn('sync config listener:', err)));
+  }, (e) => console.warn('sync config listener:', e)));
 }
 
-async function connect(id, { upload = false, withConfig = true } = {}) {
-  ensureInit();
-  if (!user) throw new Error('請先登入');
-  if (!allowed) throw new Error('尚未獲得授權');
-  roomId = id;
-  if (upload) await uploadLocal(id, { withConfig });
-  listen(id);
-  started = true;
-  setState({ roomId: id });
-}
-
-function stopListening() {
-  unsubs.forEach((u) => u());
-  unsubs = [];
-  started = false;
-  roomId = null;
-}
-
-function stopAclWatch() {
-  if (reqUnsub) { reqUnsub(); reqUnsub = null; }
-  if (allowUnsub) { allowUnsub(); allowUnsub = null; }
-}
-
-function watchRequests() {
+function watchRequests(id) {
   if (reqUnsub) return;
-  reqUnsub = onSnapshot(collection(fs, 'requests'), (snap) => {
+  reqUnsub = onSnapshot(collection(fs, 'rooms', id, 'requests'), (snap) => {
     requests = snap.docs.map((d) => d.data()).filter((r) => r && r.email);
     notify();
-  }, (err) => console.warn('sync requests listener:', err));
+  }, (e) => console.warn('sync requests listener:', e));
 }
 
-function watchOwnAllow() {
-  if (allowUnsub || !user) return;
-  allowUnsub = onSnapshot(doc(fs, 'allow', user.email), (snap) => {
-    if (snap.exists() && !allowed) {
-      allowed = true;
-      const st = getState();
-      if (st.roomId && !started) connect(st.roomId).then(() => window.renderCurrentView?.()).catch((e) => console.warn(e));
-      notify();
-    }
-  }, (err) => console.warn('sync allow listener:', err));
-}
-
-async function refreshAccess() {
-  aclReady = false;
-  allowed = false;
-  owner = false;
+function stopRoom() {
+  unsubs.forEach((u) => u());
+  unsubs = [];
+  if (reqUnsub) { reqUnsub(); reqUnsub = null; }
   requests = [];
-  stopAclWatch();
-  if (!user) { aclReady = true; notify(); return; }
+  started = false;
+  roomId = null;
+  roomOwner = null;
+}
+
+function stopPending() {
+  if (pendingUnsub) { pendingUnsub(); pendingUnsub = null; }
+  pendingRoomId = null;
+}
+
+/* ---------- 開啟帳本 ---------- */
+async function openRoom(id, { upload = false, withConfig = true, claimLegacy = false } = {}) {
+  ensureInit();
+  if (!user) throw err('not-signed-in', '請先登入');
+  const email = user.email;
+  const rootRef = doc(fs, 'rooms', id);
+  const rd = await getDoc(rootRef);
+
+  let data;
+  if (!rd.exists()) {
+    if (!claimLegacy) throw err('room-not-found', '配對碼不存在');
+    // 舊版帳本（無根文件）→ 自動升級，重連者成為建立者
+    data = { owner: email, members: { [email]: true }, createdAt: Date.now() };
+    await setDoc(rootRef, data, { merge: true });
+  } else {
+    data = rd.data();
+  }
+
+  if (!data.members || data.members[email] !== true) {
+    // 不是成員 → 轉為申請流程
+    await setDoc(doc(fs, 'rooms', id, 'requests', email), { email, at: Date.now() });
+    startPendingWatch(id);
+    setState({ pendingRoomId: id });
+    notify();
+    return { pending: true };
+  }
+
+  roomId = id;
+  roomOwner = data.owner || email;
+  if (upload) await uploadLocal(id, { withConfig });
+  listen(id);
+  if (roomOwner === email) watchRequests(id);
+  started = true;
+  setState({ roomId: id });
+  notify();
+  return { pending: false };
+}
+
+function startPendingWatch(id) {
+  stopPending();
+  pendingRoomId = id;
+  pendingUnsub = onSnapshot(doc(fs, 'rooms', id), (snap) => {
+    const d = snap.data();
+    if (d && user && d.members && d.members[user.email] === true) {
+      stopPending();
+      openRoom(id, { upload: true, withConfig: false })
+        .then(() => window.renderCurrentView?.())
+        .catch((e) => console.warn('sync join finalize:', e));
+    }
+  }, (e) => console.warn('sync pending listener:', e));
+}
+
+/* ---------- 登入狀態 ---------- */
+async function onAuth(u) {
+  user = u;
+  stopRoom();
+  stopPending();
+  if (!user) { notify(); return; }
   try { await user.reload(); } catch (e) { /* 離線忽略 */ }
   user = auth.currentUser;
-  if (!user) { aclReady = true; notify(); return; }
+  if (!user) { notify(); return; }
   try { await user.getIdToken(true); } catch (e) { /* 忽略 */ }
 
-  // 先檢查是否為建立者（建立者不需 email 驗證；可讀 /requests 清單，非建立者會被規則擋下）
-  try {
-    await getDocs(collection(fs, 'requests'));
-    owner = true;
-  } catch (e) { owner = false; }
-
-  if (owner) {
-    allowed = true;
-    watchRequests();
-  } else if (!user.emailVerified) {
-    // 非建立者需先完成 email 驗證
-    aclReady = true;
-    notify();
-    return;
-  } else {
+  const st = getState();
+  if (st.roomId) {
+    try { await openRoom(st.roomId, { claimLegacy: true }); }
+    catch (e) { console.warn('sync reconnect:', e); }
+  } else if (st.pendingRoomId) {
     try {
-      const s = await getDoc(doc(fs, 'allow', user.email));
-      allowed = s.exists();
-    } catch (e) { allowed = false; }
-    if (!allowed) {
-      // 自動送出加入申請並監聽是否被同意
-      setDoc(doc(fs, 'requests', user.email), { email: user.email, at: Date.now() }).catch(() => {});
-      watchOwnAllow();
-    }
-  }
-  aclReady = true;
-  if (allowed) {
-    const st = getState();
-    if (st.roomId && !started) {
-      try { await connect(st.roomId); window.renderCurrentView?.(); } catch (e) { console.warn('sync reconnect:', e); }
-    }
+      await setDoc(doc(fs, 'rooms', st.pendingRoomId, 'requests', user.email), { email: user.email, at: Date.now() });
+      startPendingWatch(st.pendingRoomId);
+    } catch (e) { console.warn('sync pending resume:', e); }
   }
   notify();
 }
 
+/* ---------- 對外 API ---------- */
 window.Sync = {
   get configured() { return !!cfg; },
   get enabled() { return started; },
   get signedIn() { return !!user; },
   get emailVerified() { return !!user && user.emailVerified; },
   get userEmail() { return user ? user.email : null; },
-  get allowed() { return allowed; },
-  get isOwner() { return owner; },
-  get aclReady() { return aclReady; },
+  get isOwner() { return started && !!user && roomOwner === user.email; },
   get requests() { return requests; },
+  get pending() { return !!pendingRoomId; },
+  get pendingCode() { return pendingRoomId; },
   get roomId() { return roomId; },
 
   async signIn(email, pw) {
@@ -221,30 +243,51 @@ window.Sync = {
   async resendVerification() {
     if (auth?.currentUser) await sendEmailVerification(auth.currentUser);
   },
-  async recheck() { await refreshAccess(); },
+  async recheck() { await onAuth(auth?.currentUser || null); },
   async signOutUser() {
-    stopListening();
-    stopAclWatch();
+    stopRoom();
+    stopPending();
     if (auth) await signOut(auth);
   },
-  async approve(email) {
-    await setDoc(doc(fs, 'allow', email), { email, at: Date.now() });
-    await deleteDoc(doc(fs, 'requests', email)).catch(() => {});
-  },
-  async reject(email) {
-    await deleteDoc(doc(fs, 'requests', email));
-  },
+
   async create() {
+    ensureInit();
+    if (!user) throw err('not-signed-in', '請先登入');
     const id = genCode(8);
-    await connect(id, { upload: true });
+    await setDoc(doc(fs, 'rooms', id), {
+      owner: user.email,
+      members: { [user.email]: true },
+      createdAt: Date.now(),
+    });
+    await openRoom(id, { upload: true });
     return id;
   },
   async join(code) {
     const id = String(code).trim().toUpperCase();
-    if (id.length < 6) throw new Error('配對碼格式不正確');
-    await connect(id, { upload: true, withConfig: false });
-    return id;
+    if (id.length < 6) throw err('bad-code', '配對碼格式不正確');
+    return openRoom(id, { upload: true, withConfig: false, claimLegacy: false });
   },
+  async cancelJoin() {
+    const id = pendingRoomId;
+    stopPending();
+    setState({});
+    if (id && user) await deleteDoc(doc(fs, 'rooms', id, 'requests', user.email)).catch(() => {});
+    notify();
+  },
+
+  /* 建立者操作 */
+  async approve(email) {
+    await setDoc(doc(fs, 'rooms', roomId), { members: { [email]: true } }, { merge: true });
+    await deleteDoc(doc(fs, 'rooms', roomId, 'requests', email)).catch(() => {});
+  },
+  async reject(email) {
+    await deleteDoc(doc(fs, 'rooms', roomId, 'requests', email));
+  },
+  async block(email) {
+    await setDoc(doc(fs, 'rooms', roomId), { blocked: { [email]: true } }, { merge: true });
+    await deleteDoc(doc(fs, 'rooms', roomId, 'requests', email)).catch(() => {});
+  },
+
   upsertTx(t) {
     if (started) setDoc(doc(fs, 'rooms', roomId, 'txs', t.id), t).catch((e) => console.warn('sync upsert:', e));
   },
@@ -259,17 +302,16 @@ window.Sync = {
     }, { merge: true }).catch((e) => console.warn('sync config:', e));
   },
   disconnect() {
-    stopListening();
+    stopRoom();
+    stopPending();
     setState({});
+    notify();
   },
 };
 
 if (cfg) {
   try {
     ensureInit();
-    onAuthStateChanged(auth, (u) => {
-      user = u;
-      refreshAccess();
-    });
+    onAuthStateChanged(auth, (u) => { onAuth(u); });
   } catch (e) { console.warn('sync init:', e); }
 }

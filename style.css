@@ -265,6 +265,18 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 .rank-row .amt { font-weight: 700; font-variant-numeric: tabular-nums; }
 .rank-row .pct { width: 62px; text-align: right; color: var(--text-2); font-size: 13px; font-variant-numeric: tabular-nums; flex: none; }
 
+/* 每月趨勢長條圖 */
+.trend { display: flex; align-items: flex-end; gap: 4px; height: 132px; }
+.trend-col {
+  flex: 1; border: none; background: transparent; color: var(--text-2);
+  font: inherit; font-size: 10.5px; cursor: pointer; padding: 0;
+  display: flex; flex-direction: column; align-items: center; gap: 4px; height: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+.trend-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
+.trend-bar { width: 70%; max-width: 18px; border-radius: 4px 4px 0 0; background: var(--accent); }
+.trend-lab { flex: none; }
+
 .person-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 14.5px; }
 .person-row:last-child { border-bottom: none; }
 .person-row .amt { font-weight: 700; font-variant-numeric: tabular-nums; }

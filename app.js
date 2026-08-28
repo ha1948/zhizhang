@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v17';
+const APP_VER = 'v18';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -40,13 +40,14 @@ const STR = {
     totalSpent: '總花費', subtotal: '合計',
     needPay: '{a} 需要給 {b}', allClear: '✓ 目前互不相欠', keepGoing: '繼續好好記帳吧',
     settle: '結清', settleDone: '已結清：{a} 轉給 {b} {amt}',
-    accountsHint: '「總花費」為各自應負擔的分攤金額；按「結清」會自動新增一筆今天的轉帳記錄',
+    accountsHint: '按「結清」會自動新增一筆今天的轉帳記錄',
     repMonth: '月', repYear: '年', repRange: '範圍',
     total: '總計', dailyAvg: '日均', repEmpty: '此期間沒有{k}記錄',
     transferOut: '{name} 轉出',
     settingsTitle: '設定', whoPaid: '誰付的', catManage: '類別管理',
     exportData: '匯出資料', importData: '匯入資料', cloudSync: '雲端同步',
-    settingsHint: '資料儲存在這台裝置的瀏覽器中，可用「匯出／匯入」在兩台手機之間同步（依 id 合併去重）。',
+    csvExport: '匯出 CSV', csvExported: '已匯出 CSV',
+    trend: '每月趨勢', searchCapped: '僅顯示前 100 筆，請輸入更精確的關鍵字',
     amount: '金額', category: '類別', whoReceived: '誰收到', whoSplit: '誰要分攤',
     fromWho: '誰轉出', toWho: '轉給誰', fee: '手續費', notePh: '備註⋯',
     save: '儲存', saveContinue: '儲存並繼續', done: '完成', cancel: '取消', delete: '刪除', add: '新增',
@@ -64,7 +65,6 @@ const STR = {
     selCategory: '選擇類別', whoPaidQ: '誰付的錢', whoReceivedQ: '誰收到的錢', feeWho: '手續費誰付的',
     membersTitle: '成員名稱', yourName: '你的名字', partnerName: '另一半的名字', namesSaved: '已儲存名稱',
     catEditNew: '新增類別', catEdit: '編輯類別', catName: '名稱', catNamePh: '類別名稱',
-    moveFwd: '◀ 往前排', moveBack: '往後排 ▶',
     catSaved: '已儲存類別', catDeleted: '已刪除類別', catNameReq: '請輸入類別名稱',
     catDelUsed: '有 {n} 筆記錄使用「{name}」，刪除後這些記錄會顯示為「其他」。確定刪除？',
     catDelConfirm: '確定刪除「{name}」？',
@@ -95,9 +95,11 @@ const STR = {
     verifyHint: '驗證信已寄到 {email}。請到信箱點擊驗證連結，完成後回來按「重新檢查」。',
     recheck: '我完成了，重新檢查', resend: '重寄驗證信', verifyResent: '驗證信已重寄',
     stillNotVerified: '尚未偵測到驗證完成，請確認已點擊信中連結',
-    waitingApprove: '已登入 {email}（已驗證）。已送出加入申請，等待建立者在他的 App 按「同意」⋯',
-    reqTitle: '加入申請', approve: '同意', rejectBtn: '拒絕',
+    waitingApprove: '已向帳本 {code} 送出加入申請，等待該帳本建立者同意⋯',
+    reqTitle: '加入申請', approve: '同意', rejectBtn: '拒絕', blockBtn: '封鎖',
     approvedToast: '已同意 {email} 加入', rejectedToast: '已拒絕申請',
+    blockedToast: '已封鎖 {email}', cancelReq: '取消申請', reqCancelled: '已取消申請',
+    roomNotFound: '配對碼不存在，請確認後再試',
     syncPendingVerify: '待驗證', syncPendingApprove: '待同意',
     reqIncoming: '{email} 申請加入你的資料庫：',
   },
@@ -112,13 +114,14 @@ const STR = {
     totalSpent: 'Total spent', subtotal: 'Total',
     needPay: '{a} owes {b}', allClear: '✓ All settled', keepGoing: 'Keep up the good bookkeeping',
     settle: 'Settle up', settleDone: 'Settled: {a} → {b} {amt}',
-    accountsHint: '"Total spent" is each person\'s share. "Settle up" adds a transfer record dated today.',
+    accountsHint: '"Settle up" adds a transfer record dated today.',
     repMonth: 'Month', repYear: 'Year', repRange: 'Range',
     total: 'Total', dailyAvg: 'Daily avg', repEmpty: 'No {k} records in this period',
     transferOut: '{name} sent',
     settingsTitle: 'Settings', whoPaid: 'Members', catManage: 'Categories',
     exportData: 'Export data', importData: 'Import data', cloudSync: 'Cloud sync',
-    settingsHint: 'Data is stored in this device\'s browser. Use Export / Import to sync between phones (merged by id).',
+    csvExport: 'Export CSV', csvExported: 'CSV exported',
+    trend: 'Monthly trend', searchCapped: 'Showing first 100 — refine your search',
     amount: 'Amount', category: 'Category', whoReceived: 'Received by', whoSplit: 'Split between',
     fromWho: 'From', toWho: 'To', fee: 'Fee', notePh: 'Memo…',
     save: 'Save', saveContinue: 'Save & Continue', done: 'Done', cancel: 'Cancel', delete: 'Delete', add: 'Add',
@@ -136,7 +139,6 @@ const STR = {
     selCategory: 'Choose category', whoPaidQ: 'Who paid', whoReceivedQ: 'Who received', feeWho: 'Who paid the fee',
     membersTitle: 'Member names', yourName: 'Your name', partnerName: 'Partner\'s name', namesSaved: 'Names saved',
     catEditNew: 'New category', catEdit: 'Edit category', catName: 'Name', catNamePh: 'Category name',
-    moveFwd: '◀ Move earlier', moveBack: 'Move later ▶',
     catSaved: 'Category saved', catDeleted: 'Category deleted', catNameReq: 'Enter a category name',
     catDelUsed: '{n} records use "{name}". They will show as "Other". Delete?',
     catDelConfirm: 'Delete "{name}"?',
@@ -167,9 +169,11 @@ const STR = {
     verifyHint: 'A verification email was sent to {email}. Click the link inside, then come back and press "Check again".',
     recheck: 'Done — check again', resend: 'Resend email', verifyResent: 'Verification email resent',
     stillNotVerified: 'Not verified yet — make sure you clicked the link',
-    waitingApprove: 'Signed in as {email} (verified). Join request sent — waiting for the owner to approve in their app…',
-    reqTitle: 'Join requests', approve: 'Approve', rejectBtn: 'Reject',
+    waitingApprove: 'Join request sent to book {code} — waiting for its owner to approve…',
+    reqTitle: 'Join requests', approve: 'Approve', rejectBtn: 'Reject', blockBtn: 'Block',
     approvedToast: 'Approved {email}', rejectedToast: 'Request rejected',
+    blockedToast: 'Blocked {email}', cancelReq: 'Cancel request', reqCancelled: 'Request cancelled',
+    roomNotFound: 'Pairing code not found — please check and retry',
     syncPendingVerify: 'Verify email', syncPendingApprove: 'Awaiting approval',
     reqIncoming: '{email} requests access to your database:',
   },
@@ -322,36 +326,38 @@ function txItemHTML(tx, { showDate = false } = {}) {
    左滑刪除（全域觸控手勢）
 ================================================== */
 let swEl = null, swStartX = 0, swStartY = 0, swBase = 0, swAxis = null, swMoved = false, swOpen = null;
+let swSuppressUntil = 0; // 滑動剛結束的短暫時間內吞掉誤觸點擊
 function closeSwipe() {
   if (swOpen) { swOpen.style.transform = ''; swOpen = null; }
 }
-document.addEventListener('touchstart', (e) => {
-  if (e.target.closest('.tx-del')) return; // 按刪除鈕時不要收合，讓點擊完整發生
-  const item = e.target.closest('.tx-item');
+function swStart(target, x, y) {
+  if (target.closest('.tx-del')) return; // 按刪除鈕時不要收合，讓點擊完整發生
+  const item = target.closest('.tx-item');
   if (swOpen && swOpen !== item) closeSwipe();
   if (!item) return;
   swEl = item;
-  swStartX = e.touches[0].clientX;
-  swStartY = e.touches[0].clientY;
+  swStartX = x;
+  swStartY = y;
   swBase = (item === swOpen) ? -76 : 0;
   swAxis = null;
   swMoved = false;
   item.style.transition = 'none';
-}, { passive: true });
-document.addEventListener('touchmove', (e) => {
-  if (!swEl) return;
-  const dx = e.touches[0].clientX - swStartX;
-  const dy = e.touches[0].clientY - swStartY;
+}
+function swMove(x, y) {
+  if (!swEl) return false;
+  const dx = x - swStartX;
+  const dy = y - swStartY;
   if (!swAxis) {
     if (Math.abs(dx) > 8 || Math.abs(dy) > 8) swAxis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
-    else return;
+    else return false;
   }
-  if (swAxis !== 'x') return;
+  if (swAxis !== 'x') return false;
   swMoved = true;
-  const x = Math.min(0, Math.max(-76, swBase + dx));
-  swEl.style.transform = `translateX(${x}px)`;
-}, { passive: true });
-document.addEventListener('touchend', () => {
+  const px = Math.min(0, Math.max(-76, swBase + dx));
+  swEl.style.transform = `translateX(${px}px)`;
+  return true;
+}
+function swEnd() {
   if (!swEl) return;
   const el = swEl;
   swEl = null;
@@ -360,7 +366,16 @@ document.addEventListener('touchend', () => {
   const x = m ? parseFloat(m[1]) : 0;
   if (x < -38) { el.style.transform = 'translateX(-76px)'; swOpen = el; }
   else { el.style.transform = ''; if (swOpen === el) swOpen = null; }
-});
+  if (swMoved) swSuppressUntil = Date.now() + 400;
+  swMoved = false;
+}
+document.addEventListener('touchstart', (e) => swStart(e.target, e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+document.addEventListener('touchmove', (e) => { swMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+document.addEventListener('touchend', swEnd);
+// 滑鼠拖曳（桌面版也能左滑刪除）
+document.addEventListener('mousedown', (e) => { if (e.button === 0) swStart(e.target, e.clientX, e.clientY); });
+document.addEventListener('mousemove', (e) => { if (swEl && swMove(e.clientX, e.clientY)) e.preventDefault(); });
+document.addEventListener('mouseup', swEnd);
 
 /* ==================================================
    記一筆（整頁）
@@ -544,7 +559,10 @@ function openSplit() {
 
 function updateDateBtn() {
   const d = form.date || today();
-  $('#addDateBtn').innerHTML = `${d.replace(/-/g, '/')} ${wd(d)} <span class="caret">▾</span>`;
+  const label = db.lang === 'en'
+    ? `${wd(d)}, ${d.replace(/-/g, '/')}`
+    : `${d.replace(/-/g, '/')} ${wd(d)}`;
+  $('#addDateBtn').innerHTML = `${label} <span class="caret">▾</span>`;
 }
 
 function renderAddPage() {
@@ -672,6 +690,7 @@ function openAdd(editTx = null) {
     }
     form.date = editTx.date;
     $('#addNote').value = editTx.note || '';
+    $('#feeAmount').value = '';
     $('#lastUpdated').hidden = false;
     $('#lastUpdated').textContent = `${L('lastUpdated')}：${fmtDT(editTx.updatedAt || editTx.createdAt)}`;
   } else {
@@ -702,7 +721,9 @@ function closeAdd() {
   lockScroll();
 }
 
+let lastSaveAt = 0;
 function saveTx(keepOpen) {
+  if (Date.now() - lastSaveAt < 600) return; // 防連點重複記帳
   const amount = formAmount();
   if (!amount || amount <= 0) { toast(L('enterAmount')); openKeypad(); return; }
   const date = form.date || today();
@@ -751,6 +772,7 @@ function saveTx(keepOpen) {
     }
   }
 
+  lastSaveAt = Date.now();
   if (editId) {
     const i = db.txs.findIndex((t) => t.id === editId);
     if (i >= 0) db.txs[i] = base;
@@ -933,7 +955,8 @@ function runSearch() {
   }).sort(txSort).slice(0, 100);
   box.innerHTML = hits.length
     ? `<div class="day-head" style="padding:6px 4px"><span>${L('searchFound', { n: hits.length })}</span></div>` +
-      hits.map((t) => txItemHTML(t, { showDate: true })).join('')
+      hits.map((t) => txItemHTML(t, { showDate: true })).join('') +
+      (hits.length === 100 ? `<p class="hint" style="text-align:center">${L('searchCapped')}</p>` : '')
     : `<div class="empty"><div class="big">🤷</div>${L('searchNone', { q: esc(q) })}</div>`;
 }
 
@@ -967,11 +990,10 @@ function periodDays() {
   const { start, end } = periodFilter();
   const tdy = today();
   const s = start < '2000-01-01' ? (db.txs.length ? [...db.txs].sort((a, b) => a.date.localeCompare(b.date))[0].date : tdy) : start;
-  const e = end > tdy ? tdy : e2min(end, tdy);
+  const e = end < tdy ? end : tdy;
   const ms = new Date(e + 'T00:00:00') - new Date(s + 'T00:00:00');
   return Math.max(1, Math.round(ms / 86400000) + 1);
 }
-const e2min = (a, b) => (a < b ? a : b);
 
 const repKindTxs = () => periodTxs().filter((t) =>
   repKind === 'transfer' ? (t.type === 'transfer' && !t.legacy) : t.type === repKind);
@@ -1024,7 +1046,27 @@ function renderReports() {
       <span class="chev">›</span>
     </button>`).join('');
 
-  $('#repBody').innerHTML = `
+  // 年檢視 → 每月趨勢長條圖（點長條跳到該月）
+  let trendHTML = '';
+  if (repPeriod === 'year') {
+    const monthly = Array.from({ length: 12 }, (_, i) => {
+      const ym = `${repYear}-${String(i + 1).padStart(2, '0')}`;
+      return txs.filter((t) => t.date.startsWith(ym)).reduce((s, t) => s + t.amount, 0);
+    });
+    const maxM = Math.max(...monthly, 1);
+    trendHTML = `
+      <div class="card">
+        <h2 class="card-title">${L('trend')}</h2>
+        <div class="trend">${monthly.map((v, i) => `
+          <button type="button" class="trend-col" data-m="${String(i + 1).padStart(2, '0')}" title="${fmtN(v)}">
+            <span class="trend-track"><span class="trend-bar" style="height:${v ? Math.max(4, (v / maxM) * 100) : 0}%"></span></span>
+            <span class="trend-lab">${i + 1}</span>
+          </button>`).join('')}
+        </div>
+      </div>`;
+  }
+
+  $('#repBody').innerHTML = trendHTML + `
     <div class="card">
       <div class="donut-wrap">
         <div class="donut" style="background:conic-gradient(${stops})">
@@ -1174,9 +1216,10 @@ function renderSettings() {
   let st;
   if (!S || !S.configured) st = L('syncNA');
   else if (!S.signedIn) st = L('syncOffline');
-  else if (S.allowed) st = S.enabled ? L('syncOn') : L('syncOffline');
+  else if (S.enabled) st = L('syncOn');
+  else if (S.pending) st = L('syncPendingApprove');
   else if (!S.emailVerified) st = L('syncPendingVerify');
-  else st = L('syncPendingApprove');
+  else st = L('syncOffline');
   $('#setSyncVal').textContent = st;
   $('#verLabel').textContent = '智賬 ' + APP_VER;
 }
@@ -1189,7 +1232,8 @@ function syncReqBlock(S) {
       <p class="hint" style="margin:0 0 8px">${L('reqIncoming', { email: esc(r.email) })}</p>
       <div class="dialog-actions" style="margin-bottom:6px">
         <button class="btn btn-primary btn-sm" data-approve="${esc(r.email)}">${L('approve')}</button>
-        <button class="btn btn-danger btn-sm" data-reject="${esc(r.email)}">${L('rejectBtn')}</button>
+        <button class="btn btn-ghost btn-sm" data-reject="${esc(r.email)}">${L('rejectBtn')}</button>
+        <button class="btn btn-danger btn-sm" data-block="${esc(r.email)}">${L('blockBtn')}</button>
       </div>`).join('')}
   </div>`;
 }
@@ -1218,7 +1262,15 @@ function renderSyncDialog() {
       <div class="dialog-actions">
         <button class="btn btn-ghost btn-block" id="btnSyncSignup">${L('signUp')}</button>
       </div>`;
-  } else if (!S.allowed && !S.emailVerified) {
+  } else if (S.pending) {
+    body.innerHTML = `
+      <p class="hint" style="margin-top:0">${L('waitingApprove', { code: esc(S.pendingCode || '') })}</p>
+      <div class="sync-code">${esc(S.pendingCode || '')}</div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" id="btnSyncCancelReq">${L('cancelReq')}</button>
+        <button class="btn btn-ghost" id="btnSyncLogout">${L('signOut')}</button>
+      </div>`;
+  } else if (!S.enabled && !S.emailVerified) {
     body.innerHTML = `
       <p class="hint" style="margin-top:0">${L('verifyHint', { email: esc(S.userEmail || '') })}</p>
       <div class="dialog-actions">
@@ -1227,15 +1279,6 @@ function renderSyncDialog() {
       <div class="dialog-actions">
         <button class="btn btn-ghost" id="btnSyncResend">${L('resend')}</button>
         <button class="btn btn-ghost" id="btnSyncLogout">${L('signOut')}</button>
-      </div>`;
-  } else if (!S.allowed) {
-    body.innerHTML = `
-      <p class="hint" style="margin-top:0">${L('waitingApprove', { email: esc(S.userEmail || '') })}</p>
-      <div class="dialog-actions">
-        <button class="btn btn-primary btn-block" id="btnSyncRecheck">${L('recheck')}</button>
-      </div>
-      <div class="dialog-actions">
-        <button class="btn btn-ghost btn-block" id="btnSyncLogout">${L('signOut')}</button>
       </div>`;
   } else if (S.enabled) {
     body.innerHTML = syncReqBlock(S) + `
@@ -1370,6 +1413,26 @@ function bindCatDrag() {
   }, { passive: false });
   box.addEventListener('touchend', cdEnd);
   box.addEventListener('touchcancel', cdEnd);
+  // 滑鼠拖曳（桌面版）
+  box.addEventListener('mousedown', (e) => {
+    if (e.button !== 0 || !catEditMode) return;
+    if (e.target.closest('.cat-minus')) return;
+    const tile = e.target.closest('.cat-tile:not(.add-tile)');
+    if (!tile) return;
+    cdTile = tile;
+    cdStartX = e.clientX;
+    cdStartY = e.clientY;
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!cdTile) return;
+    if (!cdDragging) {
+      if (Math.hypot(e.clientX - cdStartX, e.clientY - cdStartY) < 6) return;
+      cdStart(cdTile, e);
+    }
+    e.preventDefault();
+    cdMove(e);
+  });
+  document.addEventListener('mouseup', () => { if (cdTile) cdEnd(); });
 }
 
 function saveCatEdit() {
@@ -1430,6 +1493,7 @@ let curView = 'books';
 function switchView(name) {
   curView = name;
   closeSwipe();
+  window.scrollTo(0, 0);
   $$('.view').forEach((v) => { v.hidden = v.id !== 'view-' + name; });
   $$('.tabbar .tab[data-view]').forEach((t) => t.classList.toggle('active', t.dataset.view === name));
   renderCurrentView();
@@ -1452,6 +1516,35 @@ function exportData() {
   a.click();
   URL.revokeObjectURL(a.href);
   toast(L('exported'));
+}
+
+function exportCSV() {
+  const q = (v) => {
+    v = String(v ?? '');
+    return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  };
+  const en = db.lang === 'en';
+  const header = en
+    ? ['Date', 'Type', 'Category', 'Amount', 'Paid by / From', 'Received by / To', `${db.members.p1} share`, `${db.members.p2} share`, 'Memo', 'Created']
+    : ['日期', '類型', '類別', '金額', '付款人/轉出', '收款人/轉入', `${db.members.p1}分攤`, `${db.members.p2}分攤`, '備註', '建立時間'];
+  const rows = [...db.txs].sort((a, b) => a.date.localeCompare(b.date) || (a.createdAt || 0) - (b.createdAt || 0)).map((t) => {
+    const c = catOf(t);
+    const from = t.type === 'transfer' ? (t.legacy ? (t.fromAccount || '') : db.members[t.from] || '') : (db.members[t.payer] || '');
+    const to = t.type === 'transfer' ? (t.legacy ? (t.toAccount || '') : db.members[t.to] || '') : '';
+    return [
+      t.date, L(t.type), c.name, t.amount, from, to,
+      t.split ? (t.split.p1 || 0) : '', t.split ? (t.split.p2 || 0) : '',
+      t.note || '', fmtDT(t.createdAt),
+    ].map(q).join(',');
+  });
+  const csv = '﻿' + header.map(q).join(',') + '\n' + rows.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `zhizhang-${today()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  toast(L('csvExported'));
 }
 
 function importData(file) {
@@ -1695,7 +1788,7 @@ function bind() {
       if (del) { openConfirmDel(del.dataset.delid); return; }
       const item = e.target.closest('.tx-item');
       if (!item) return;
-      if (swMoved) { swMoved = false; return; }   // 剛滑動完，不觸發編輯
+      if (Date.now() < swSuppressUntil) return;   // 剛滑動完，不觸發編輯
       if (swOpen) { closeSwipe(); return; }        // 有展開的刪除鈕 → 先收合
       const tx = db.txs.find((t) => t.id === item.dataset.id);
       if (!tx) return;
@@ -1769,6 +1862,13 @@ function bind() {
     renderReports();
   });
   $('#repBody').addEventListener('click', (e) => {
+    const col = e.target.closest('.trend-col[data-m]');
+    if (col) {
+      repMonth = `${repYear}-${col.dataset.m}`;
+      repPeriod = 'month';
+      renderReports();
+      return;
+    }
     const row = e.target.closest('.rank-row[data-key]');
     if (row) openRepDetail(row.dataset.key);
   });
@@ -1813,6 +1913,7 @@ function bind() {
       renderSyncDialog();
       $('#dlgSync').showModal();
     } else if (kind === 'export') exportData();
+    else if (kind === 'csv') exportCSV();
     else if (kind === 'import') $('#fileImport').click();
   });
   $('#btnMembersSave').addEventListener('click', () => {
@@ -1901,12 +2002,27 @@ function bind() {
       if (!code.trim()) { toast(L('enterCode')); return; }
       try {
         toast(L('connecting'));
-        await S.join(code);
+        const res = await S.join(code);
         renderSyncDialog();
         renderSettings();
         renderCurrentView();
-        toast(L('bookJoined'));
-      } catch (err) { toast(L('joinFail', { e: err.message })); }
+        if (!res || !res.pending) toast(L('bookJoined'));
+      } catch (err) {
+        toast(err.code === 'room-not-found' ? L('roomNotFound') : L('joinFail', { e: err.message }));
+      }
+      return;
+    }
+    if (e.target.closest('#btnSyncCancelReq')) {
+      await S.cancelJoin();
+      renderSyncDialog();
+      renderSettings();
+      toast(L('reqCancelled'));
+      return;
+    }
+    const bk = e.target.closest('[data-block]');
+    if (bk) {
+      try { await S.block(bk.dataset.block); toast(L('blockedToast', { email: bk.dataset.block })); renderSyncDialog(); }
+      catch (err) { toast(L('loginFail', { e: err.message })); }
       return;
     }
     if (e.target.closest('#btnSyncOff')) {
