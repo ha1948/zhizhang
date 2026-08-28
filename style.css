@@ -303,6 +303,7 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
   display: flex; flex-direction: column;
   animation: page-up .22s ease;
 }
+#addPage { z-index: 32; } /* 記帳/編輯頁永遠在其他覆蓋頁（報表明細、搜尋）之上 */
 @keyframes page-up { from { opacity: 0; transform: translateY(24px); } }
 .add-head {
   display: flex; align-items: center; gap: 10px;

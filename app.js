@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v14';
+const APP_VER = 'v15';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -1492,7 +1492,17 @@ function openConfirmDel(id) {
    事件綁定
 ================================================== */
 function bind() {
-  $$('.tabbar .tab[data-view]').forEach((t) => t.addEventListener('click', () => switchView(t.dataset.view)));
+  $$('.tabbar .tab[data-view]').forEach((t) => t.addEventListener('click', () => {
+    const name = t.dataset.view;
+    if (name === curView) {
+      // 已在此分頁 → 再點一次回到當月
+      if (name === 'books') { booksMonth = thisMonth(); selectedDay = today(); renderBooks(); }
+      else if (name === 'reports') { repPeriod = 'month'; repMonth = thisMonth(); renderReports(); }
+      else if (name === 'accounts') { accMonth = thisMonth(); renderAccounts(); }
+      return;
+    }
+    switchView(name);
+  }));
   $('#btnAdd').addEventListener('click', () => openAdd());
 
   // 所有 dialog：點背景關閉 + ✕ 按鈕
