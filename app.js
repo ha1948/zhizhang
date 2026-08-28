@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v15';
+const APP_VER = 'v16';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -802,8 +802,10 @@ function openPicker(kind) {
   const body = $('#pickerBody');
   if (kind === 'category') {
     $('#pickerTitle').textContent = L('selCategory');
-    body.innerHTML = `<div class="picker-grid">` + cats(form.type).map((c) =>
-      `<button class="chip ${c.id === form.category ? 'active' : ''}" data-val="${c.id}">${c.icon} ${esc(c.name)}</button>`).join('') + `</div>`;
+    body.innerHTML = `<div class="cat-tiles pick-grid">` + cats(form.type).map((c) => `
+      <button type="button" class="cat-tile ${c.id === form.category ? 'active' : ''}" data-val="${c.id}">
+        <span class="em">${c.icon}</span><span class="nm">${esc(c.name)}</span>
+      </button>`).join('') + `</div>`;
   } else if (kind === 'lang') {
     $('#pickerTitle').textContent = 'Language';
     body.innerHTML = `<div class="picker-grid">
@@ -1531,7 +1533,7 @@ function bind() {
   });
   $('#dlgPicker').addEventListener('click', (e) => {
     const dlg = $('#dlgPicker');
-    const chip = e.target.closest('.chip');
+    const chip = e.target.closest('[data-val]');
     if (!chip) return;
     const kind = dlg.dataset.kind, val = chip.dataset.val;
     if (kind === 'category') form.category = val;

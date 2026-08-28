@@ -443,6 +443,19 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 }
 .cat-emoji-input { text-align: center; font-size: 22px; }
 
+/* 類別選擇（固定格子） */
+.pick-grid { grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.pick-grid .cat-tile {
+  background: var(--card-flat); box-shadow: none;
+  padding: 12px 2px 9px; font-size: 12px;
+  border: 2px solid transparent;
+}
+.pick-grid .cat-tile .em { font-size: 24px; }
+.pick-grid .cat-tile.active {
+  background: var(--accent-soft); border-color: var(--accent);
+  color: var(--accent); font-weight: 600;
+}
+
 /* 分攤 */
 .check-row { display: flex; gap: 8px; }
 .check-pill {
