@@ -89,6 +89,14 @@ const STR = {
     loginDone: '登入成功', loginFail: '登入失敗：{e}', signupDone: '帳號已建立並登入',
     enterEmailPw: '請輸入 Email 與密碼', pwTooShort: '密碼至少 6 碼',
     signedOut: '已登出',
+    verifyHint: '驗證信已寄到 {email}。請到信箱點擊驗證連結，完成後回來按「重新檢查」。',
+    recheck: '我完成了，重新檢查', resend: '重寄驗證信', verifyResent: '驗證信已重寄',
+    stillNotVerified: '尚未偵測到驗證完成，請確認已點擊信中連結',
+    waitingApprove: '已登入 {email}（已驗證）。已送出加入申請，等待建立者在他的 App 按「同意」⋯',
+    reqTitle: '加入申請', approve: '同意', rejectBtn: '拒絕',
+    approvedToast: '已同意 {email} 加入', rejectedToast: '已拒絕申請',
+    syncPendingVerify: '待驗證', syncPendingApprove: '待同意',
+    reqIncoming: '{email} 申請加入你的資料庫：',
   },
   en: {
     calendar: 'Calendar', list: 'List', io: 'In/Out', transfer: 'Transfer', all: 'All',
@@ -151,6 +159,14 @@ const STR = {
     loginDone: 'Signed in', loginFail: 'Sign-in failed: {e}', signupDone: 'Account created & signed in',
     enterEmailPw: 'Enter email and password', pwTooShort: 'Password must be 6+ characters',
     signedOut: 'Signed out',
+    verifyHint: 'A verification email was sent to {email}. Click the link inside, then come back and press "Check again".',
+    recheck: 'Done — check again', resend: 'Resend email', verifyResent: 'Verification email resent',
+    stillNotVerified: 'Not verified yet — make sure you clicked the link',
+    waitingApprove: 'Signed in as {email} (verified). Join request sent — waiting for the owner to approve in their app…',
+    reqTitle: 'Join requests', approve: 'Approve', rejectBtn: 'Reject',
+    approvedToast: 'Approved {email}', rejectedToast: 'Request rejected',
+    syncPendingVerify: 'Verify email', syncPendingApprove: 'Awaiting approval',
+    reqIncoming: '{email} requests access to your database:',
   },
 };
 const WEEK_ZH = ['日', '一', '二', '三', '四', '五', '六'];
@@ -305,6 +321,7 @@ function closeSwipe() {
   if (swOpen) { swOpen.style.transform = ''; swOpen = null; }
 }
 document.addEventListener('touchstart', (e) => {
+  if (e.target.closest('.tx-del')) return; // 按刪除鈕時不要收合，讓點擊完整發生
   const item = e.target.closest('.tx-item');
   if (swOpen && swOpen !== item) closeSwipe();
   if (!item) return;
@@ -1147,7 +1164,26 @@ function renderSettings() {
   $('#setMembersVal').textContent = `${db.members.p1}、${db.members.p2}`;
   $('#setLangVal').textContent = db.lang === 'en' ? 'English' : '中文';
   const S = window.Sync;
-  $('#setSyncVal').textContent = !S || !S.configured ? L('syncNA') : (S.enabled ? L('syncOn') : L('syncOffline'));
+  let st;
+  if (!S || !S.configured) st = L('syncNA');
+  else if (!S.signedIn) st = L('syncOffline');
+  else if (!S.emailVerified) st = L('syncPendingVerify');
+  else if (!S.allowed) st = L('syncPendingApprove');
+  else st = S.enabled ? L('syncOn') : L('syncOffline');
+  $('#setSyncVal').textContent = st;
+}
+
+function syncReqBlock(S) {
+  if (!S.isOwner || !S.requests.length) return '';
+  return `<div class="card-flat" style="margin-bottom:14px">
+    <h2 class="card-title" style="margin-bottom:8px">${L('reqTitle')}</h2>
+    ${S.requests.map((r) => `
+      <p class="hint" style="margin:0 0 8px">${L('reqIncoming', { email: esc(r.email) })}</p>
+      <div class="dialog-actions" style="margin-bottom:6px">
+        <button class="btn btn-primary btn-sm" data-approve="${esc(r.email)}">${L('approve')}</button>
+        <button class="btn btn-danger btn-sm" data-reject="${esc(r.email)}">${L('rejectBtn')}</button>
+      </div>`).join('')}
+  </div>`;
 }
 
 function renderSyncDialog() {
@@ -1174,8 +1210,27 @@ function renderSyncDialog() {
       <div class="dialog-actions">
         <button class="btn btn-ghost btn-block" id="btnSyncSignup">${L('signUp')}</button>
       </div>`;
-  } else if (S.enabled) {
+  } else if (!S.emailVerified) {
     body.innerHTML = `
+      <p class="hint" style="margin-top:0">${L('verifyHint', { email: esc(S.userEmail || '') })}</p>
+      <div class="dialog-actions">
+        <button class="btn btn-primary btn-block" id="btnSyncRecheck">${L('recheck')}</button>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost" id="btnSyncResend">${L('resend')}</button>
+        <button class="btn btn-ghost" id="btnSyncLogout">${L('signOut')}</button>
+      </div>`;
+  } else if (!S.allowed) {
+    body.innerHTML = `
+      <p class="hint" style="margin-top:0">${L('waitingApprove', { email: esc(S.userEmail || '') })}</p>
+      <div class="dialog-actions">
+        <button class="btn btn-primary btn-block" id="btnSyncRecheck">${L('recheck')}</button>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost btn-block" id="btnSyncLogout">${L('signOut')}</button>
+      </div>`;
+  } else if (S.enabled) {
+    body.innerHTML = syncReqBlock(S) + `
       <p class="hint" style="margin-top:0">${L('syncOnHint')}</p>
       <div class="sync-code">${esc(S.roomId)}</div>
       <p class="hint">${L('syncCodeHint')}</p>
@@ -1188,7 +1243,7 @@ function renderSyncDialog() {
         <button class="btn btn-ghost btn-block" id="btnSyncLogout">${L('signOut')}</button>
       </div>`;
   } else {
-    body.innerHTML = `
+    body.innerHTML = syncReqBlock(S) + `
       <p class="hint" style="margin-top:0">${L('syncSetupHint')}</p>
       <p class="hint" style="margin-top:0">${L('signedInAs', { email: esc(S.userEmail || '') })}</p>
       <button class="btn btn-primary btn-block" id="btnSyncCreate" style="margin-bottom:14px">${L('createBook')}</button>
@@ -1221,7 +1276,6 @@ function openCatEdit(id) {
   const isNew = id === '__new';
   $('#catEditTitle').textContent = isNew ? L('catEditNew') : L('catEdit');
   $('#btnCatDelete').hidden = isNew;
-  $('#catMoveRow').hidden = isNew;
   if (isNew) {
     $('#inpCatEmoji').value = '';
     $('#inpCatName').value = '';
@@ -1234,15 +1288,78 @@ function openCatEdit(id) {
   $('#dlgCatEdit').showModal();
 }
 
-function moveCat(dir) {
-  const arr = db.categories[catPageType];
-  const i = arr.findIndex((x) => x.id === editingCatId);
-  const j = i + dir;
-  if (i < 0 || j < 0 || j >= arr.length) return;
-  [arr[i], arr[j]] = [arr[j], arr[i]];
-  save();
-  syncConfig();
-  renderCatTiles();
+/* ----- 類別拖拉排序（長按 250ms 後拖曳） ----- */
+let cdTile = null, cdGhost = null, cdTimer = null, cdDragging = false, cdOffX = 0, cdOffY = 0, cdSuppressClick = false;
+
+function cdStart(tile, touch) {
+  cdDragging = true;
+  cdSuppressClick = true;
+  const r = tile.getBoundingClientRect();
+  cdGhost = tile.cloneNode(true);
+  cdGhost.classList.add('cat-ghost');
+  cdGhost.style.width = r.width + 'px';
+  cdGhost.style.height = r.height + 'px';
+  cdGhost.style.left = r.left + 'px';
+  cdGhost.style.top = r.top + 'px';
+  document.body.appendChild(cdGhost);
+  cdOffX = touch.clientX - r.left;
+  cdOffY = touch.clientY - r.top;
+  tile.classList.add('drag-src');
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+function cdMove(touch) {
+  cdGhost.style.left = (touch.clientX - cdOffX) + 'px';
+  cdGhost.style.top = (touch.clientY - cdOffY) + 'px';
+  const el = document.elementFromPoint(touch.clientX, touch.clientY);
+  const over = el && el.closest('.cat-tile:not(.add-tile)');
+  if (over && over !== cdTile && over.parentElement === cdTile.parentElement) {
+    const tiles = [...cdTile.parentElement.children];
+    if (tiles.indexOf(cdTile) < tiles.indexOf(over)) over.after(cdTile);
+    else over.before(cdTile);
+  }
+}
+function cdEnd() {
+  if (cdGhost) cdGhost.remove();
+  cdGhost = null;
+  if (cdTile) cdTile.classList.remove('drag-src');
+  if (cdDragging) {
+    const order = [...document.querySelectorAll('#catTiles .cat-tile:not(.add-tile)')].map((t) => t.dataset.cat);
+    db.categories[catPageType].sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+    save();
+    syncConfig();
+  }
+  cdTile = null;
+  cdDragging = false;
+}
+function bindCatDrag() {
+  const box = $('#catTiles');
+  box.addEventListener('touchstart', (e) => {
+    const tile = e.target.closest('.cat-tile:not(.add-tile)');
+    if (!tile) return;
+    cdTile = tile;
+    cdSuppressClick = false;
+    const t = e.touches[0];
+    const sx = t.clientX, sy = t.clientY;
+    cdTimer = setTimeout(() => { if (cdTile) cdStart(cdTile, { clientX: sx, clientY: sy }); }, 250);
+  }, { passive: true });
+  box.addEventListener('touchmove', (e) => {
+    if (!cdTile) return;
+    if (!cdDragging) {
+      clearTimeout(cdTimer); // 開始捲動 → 取消長按
+      cdTile = null;
+      return;
+    }
+    e.preventDefault();
+    cdMove(e.touches[0]);
+  }, { passive: false });
+  box.addEventListener('touchend', () => {
+    clearTimeout(cdTimer);
+    cdEnd();
+  });
+  box.addEventListener('touchcancel', () => {
+    clearTimeout(cdTimer);
+    cdEnd();
+  });
 }
 
 function saveCatEdit() {
@@ -1717,6 +1834,34 @@ function bind() {
       toast(L('signedOut'));
       return;
     }
+    if (e.target.closest('#btnSyncRecheck')) {
+      toast(L('connecting'));
+      await S.recheck();
+      renderSyncDialog();
+      renderSettings();
+      if (S.signedIn && !S.emailVerified) toast(L('stillNotVerified'));
+      return;
+    }
+    if (e.target.closest('#btnSyncResend')) {
+      try { await S.resendVerification(); toast(L('verifyResent')); }
+      catch (err) { toast(L('loginFail', { e: (err.code || '').replace('auth/', '') })); }
+      return;
+    }
+    const ap = e.target.closest('[data-approve]');
+    if (ap) {
+      try {
+        await S.approve(ap.dataset.approve);
+        toast(L('approvedToast', { email: ap.dataset.approve }));
+        renderSyncDialog();
+      } catch (err) { toast(L('loginFail', { e: err.message })); }
+      return;
+    }
+    const rj = e.target.closest('[data-reject]');
+    if (rj) {
+      try { await S.reject(rj.dataset.reject); toast(L('rejectedToast')); renderSyncDialog(); }
+      catch (err) { toast(L('loginFail', { e: err.message })); }
+      return;
+    }
     if (e.target.closest('#btnSyncCreate')) {
       try {
         toast(L('creating'));
@@ -1756,19 +1901,22 @@ function bind() {
     renderCatTiles();
   });
   $('#catTiles').addEventListener('click', (e) => {
+    if (cdSuppressClick) { cdSuppressClick = false; return; } // 拖曳結束，不觸發編輯
     const tile = e.target.closest('.cat-tile'); if (!tile) return;
     openCatEdit(tile.dataset.cat);
   });
+  bindCatDrag();
   $('#btnCatSave').addEventListener('click', saveCatEdit);
   $('#btnCatDelete').addEventListener('click', deleteCat);
-  $('#btnCatFwd').addEventListener('click', () => moveCat(-1));
-  $('#btnCatBack').addEventListener('click', () => moveCat(1));
 }
 
 /* ---------- 啟動 ---------- */
 bind();
 applyLang();
 switchView('books');
+
+// 同步狀態改變（登入/驗證/獲准/新申請）時刷新開著的同步彈窗
+window.onSyncChanged = () => { if ($('#dlgSync').open) renderSyncDialog(); };
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
   navigator.serviceWorker.register('sw.js').catch(() => {});
