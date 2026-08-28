@@ -1,5 +1,5 @@
 /* 智賬 service worker */
-const CACHE = 'zhizhang-v9';
+const CACHE = 'zhizhang-v10';
 const ASSETS = [
   './',
   './index.html',

@@ -40,14 +40,22 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 [hidden] { display: none !important; }
-html { -webkit-text-size-adjust: 100%; }
+html {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;       /* 取消雙擊縮放 */
+  overscroll-behavior: none;
+}
 body {
   font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
   background: var(--bg);
   color: var(--text);
   line-height: 1.5;
   padding-bottom: calc(76px + env(safe-area-inset-bottom));
+  -webkit-touch-callout: none;
 }
+html.locked, html.locked body { overflow: hidden; }
+button:focus, [role="button"]:focus, dialog:focus { outline: none; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 
 /* ---------- 頁首 ---------- */
@@ -120,7 +128,7 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 .input {
   width: 100%; border: 1px solid var(--line); background: var(--card);
   color: var(--text); border-radius: var(--radius-sm);
-  padding: 10px 12px; font: inherit; font-size: 15px; outline: none;
+  padding: 10px 12px; font: inherit; font-size: 16px; outline: none;
 }
 .input:focus { border-color: var(--accent); }
 
@@ -173,10 +181,20 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 /* ---------- 明細列表 ---------- */
 .day-group { margin-bottom: 16px; }
 .day-head { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-2); padding: 0 4px 6px; }
+.tx-swipe { position: relative; margin-bottom: 8px; border-radius: var(--radius); }
+.tx-swipe .tx-del {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 76px;
+  border: none; border-radius: var(--radius);
+  background: var(--expense); color: #fff;
+  font: inherit; font-size: 14px; font-weight: 700; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 .tx-item {
+  position: relative; z-index: 1;
   display: flex; align-items: center; gap: 12px;
   background: var(--card); border-radius: var(--radius);
-  padding: 12px 14px; margin-bottom: 8px; box-shadow: var(--shadow); cursor: pointer;
+  padding: 12px 14px; box-shadow: var(--shadow); cursor: pointer;
+  transition: transform .18s ease;
   -webkit-tap-highlight-color: transparent;
 }
 .tx-icon {
@@ -232,8 +250,11 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 .rep-meta b { color: var(--text); font-variant-numeric: tabular-nums; }
 
 .rank-row {
-  display: flex; align-items: center; gap: 12px;
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  border: none; background: transparent; color: var(--text);
+  font: inherit; text-align: left; cursor: pointer;
   padding: 11px 2px; border-bottom: 1px solid var(--line); font-size: 14.5px;
+  -webkit-tap-highlight-color: transparent;
 }
 .rank-row:last-child { border-bottom: none; }
 .rank-row .idx { width: 18px; color: var(--text-2); font-size: 13px; flex: none; text-align: center; }
@@ -345,9 +366,10 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 .memo-card { padding: 6px 16px; }
 .memo-input {
   width: 100%; border: none; background: transparent; color: var(--text);
-  font: inherit; font-size: 15px; padding: 10px 0; outline: none;
+  font: inherit; font-size: 16px; padding: 10px 0; outline: none;
   resize: vertical; min-height: 96px;
 }
+.last-updated { text-align: center; margin-top: 4px; }
 
 /* 開關 */
 .switch { position: relative; display: inline-flex; flex: none; cursor: pointer; }
@@ -447,24 +469,31 @@ main { max-width: 560px; margin: 0 auto; padding: 0 16px; }
 /* ---------- 搜尋 ---------- */
 .search-input { flex: 1; border-radius: var(--radius-sm); }
 
-/* ---------- Dialog / Sheet ---------- */
+/* ---------- Dialog（一律置中） ---------- */
 .dialog {
+  position: fixed; top: 50%; left: 50%;
+  transform: translate(-50%, -50%); margin: 0;
   border: none; border-radius: var(--radius);
   background: var(--card); color: var(--text);
-  padding: 22px; width: min(92vw, 380px);
-  box-shadow: 0 12px 40px rgba(0,0,0,0.18);
+  padding: 22px; width: min(92vw, 400px);
+  max-height: 84vh; overflow-y: auto;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.22);
 }
 .dialog::backdrop { background: rgba(20, 26, 24, 0.45); }
-.dialog-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+.dialog-title { font-size: 17px; font-weight: 700; margin-bottom: 16px; padding-right: 28px; }
+.dialog-x {
+  position: absolute; top: 12px; right: 12px;
+  border: none; background: var(--card-flat); color: var(--text-2);
+  width: 30px; height: 30px; border-radius: 9px; font-size: 14px;
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
 .dialog-actions { display: flex; gap: 10px; margin-top: 6px; }
 .dialog-actions .btn { flex: 1; }
 .dialog-actions-col { flex-direction: column; }
 .hint { font-size: 12.5px; color: var(--text-2); margin-top: 14px; }
 
-.sheet {
-  width: min(100vw, 560px); max-height: 70vh;
-  margin: auto auto 0; border-radius: var(--radius) var(--radius) 0 0;
-}
+.sheet { /* 保留類名，樣式同置中 dialog */ }
 .picker-grid { display: flex; flex-wrap: wrap; gap: 8px; }
 .chip {
   border: 1px solid var(--line); background: var(--card); color: var(--text);

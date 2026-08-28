@@ -2,7 +2,7 @@
 <html lang="zh-Hant">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>智賬</title>
 <meta name="description" content="智賬 — 兩人共同記帳 App">
 <meta name="theme-color" content="#F7F7F4">
@@ -23,8 +23,8 @@
   <div class="page-head">
     <span class="logo-mark">智</span>
     <div class="segmented seg-pill" id="segBooksMode">
-      <button class="seg-btn active" data-mode="calendar">日曆</button>
-      <button class="seg-btn" data-mode="list">列表</button>
+      <button class="seg-btn active" data-mode="calendar" data-i18n="calendar">日曆</button>
+      <button class="seg-btn" data-mode="list" data-i18n="list">列表</button>
     </div>
     <button id="btnSearch" class="icon-btn" aria-label="搜尋">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
@@ -39,23 +39,19 @@
     <button class="icon-btn" id="booksNext" aria-label="下個月">›</button>
   </div>
 
-  <!-- 日曆模式 -->
   <div id="booksCalendar">
     <div class="card cal-card">
-      <div class="cal-week">
-        <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
-      </div>
+      <div class="cal-week" id="calWeek"></div>
       <div class="cal-grid" id="calGrid"></div>
     </div>
     <div id="dayDetail"></div>
   </div>
 
-  <!-- 列表模式 -->
   <div id="booksList" hidden>
     <div class="segmented" id="segListFilter">
-      <button class="seg-btn active" data-filter="io">收支</button>
-      <button class="seg-btn" data-filter="transfer">轉帳</button>
-      <button class="seg-btn" data-filter="all">全部</button>
+      <button class="seg-btn active" data-filter="io" data-i18n="io">收支</button>
+      <button class="seg-btn" data-filter="transfer" data-i18n="transfer">轉帳</button>
+      <button class="seg-btn" data-filter="all" data-i18n="all">全部</button>
     </div>
     <div class="month-summary card-flat" id="listSummary"></div>
     <div id="txList"></div>
@@ -64,7 +60,7 @@
 
 <!-- ============ Accounts（成員結算） ============ -->
 <section id="view-accounts" class="view" hidden>
-  <div class="page-head"><span class="logo-mark">智</span><div class="page-title">成員結算</div><span class="head-spacer"></span></div>
+  <div class="page-head"><span class="logo-mark">智</span><div class="page-title" data-i18n="accountsTitle">成員結算</div><span class="head-spacer"></span></div>
   <div id="accountsBody"></div>
 </section>
 
@@ -73,9 +69,9 @@
   <div class="page-head">
     <span class="logo-mark">智</span>
     <div class="segmented seg-pill" id="segRepPeriod">
-      <button class="seg-btn active" data-period="month">月</button>
-      <button class="seg-btn" data-period="year">年</button>
-      <button class="seg-btn" data-period="range">範圍</button>
+      <button class="seg-btn active" data-period="month" data-i18n="repMonth">月</button>
+      <button class="seg-btn" data-period="year" data-i18n="repYear">年</button>
+      <button class="seg-btn" data-period="range" data-i18n="repRange">範圍</button>
     </div>
     <span class="head-spacer"></span>
   </div>
@@ -87,9 +83,9 @@
   </div>
 
   <div id="repIOWrap" class="segmented" style="margin-bottom:14px">
-    <button class="seg-btn active" data-kind="expense">支出</button>
-    <button class="seg-btn" data-kind="income">收入</button>
-    <button class="seg-btn" data-kind="transfer">轉帳</button>
+    <button class="seg-btn active" data-kind="expense" data-i18n="expense">支出</button>
+    <button class="seg-btn" data-kind="income" data-i18n="income">收入</button>
+    <button class="seg-btn" data-kind="transfer" data-i18n="transfer">轉帳</button>
   </div>
 
   <div id="repBody"></div>
@@ -97,35 +93,39 @@
 
 <!-- ============ Settings ============ -->
 <section id="view-settings" class="view" hidden>
-  <div class="page-head"><span class="logo-mark">智</span><div class="page-title">設定</div><span class="head-spacer"></span></div>
+  <div class="page-head"><span class="logo-mark">智</span><div class="page-title" data-i18n="settingsTitle">設定</div><span class="head-spacer"></span></div>
   <div class="row-list">
     <button type="button" class="form-row" data-set="members">
-      <span class="ric">👥</span><span class="rlab">誰付的</span>
+      <span class="ric">👥</span><span class="rlab" data-i18n="whoPaid">誰付的</span>
       <span class="rval" id="setMembersVal"></span><span class="chev">›</span>
     </button>
     <button type="button" class="form-row" data-set="categories">
-      <span class="ric">🏷️</span><span class="rlab">類別管理</span>
+      <span class="ric">🏷️</span><span class="rlab" data-i18n="catManage">類別管理</span>
       <span class="rval"></span><span class="chev">›</span>
+    </button>
+    <button type="button" class="form-row" data-set="lang">
+      <span class="ric">🌐</span><span class="rlab">Language</span>
+      <span class="rval" id="setLangVal"></span><span class="chev">›</span>
     </button>
   </div>
   <div class="row-list">
     <button type="button" class="form-row" data-set="sync">
-      <span class="ric">☁️</span><span class="rlab">雲端同步</span>
+      <span class="ric">☁️</span><span class="rlab" data-i18n="cloudSync">雲端同步</span>
       <span class="rval" id="setSyncVal"></span><span class="chev">›</span>
     </button>
   </div>
   <div class="row-list">
     <button type="button" class="form-row" data-set="export">
-      <span class="ric">📤</span><span class="rlab">匯出資料</span>
+      <span class="ric">📤</span><span class="rlab" data-i18n="exportData">匯出資料</span>
       <span class="rval"></span><span class="chev">›</span>
     </button>
     <button type="button" class="form-row" data-set="import">
-      <span class="ric">📥</span><span class="rlab">匯入資料</span>
+      <span class="ric">📥</span><span class="rlab" data-i18n="importData">匯入資料</span>
       <span class="rval"></span><span class="chev">›</span>
     </button>
     <input id="fileImport" type="file" accept="application/json" hidden>
   </div>
-  <p class="hint">資料儲存在這台裝置的瀏覽器中，可用「匯出／匯入」在兩台手機之間同步（依 id 合併去重）。</p>
+  <p class="hint" data-i18n="settingsHint">資料儲存在這台裝置的瀏覽器中，可用「匯出／匯入」在兩台手機之間同步（依 id 合併去重）。</p>
 </section>
 
 </main>
@@ -159,9 +159,9 @@
   <div class="add-head">
     <button id="btnAddClose" class="icon-btn icon-btn-plain" aria-label="關閉">✕</button>
     <div class="segmented seg-pill" id="segAddType">
-      <button class="seg-btn active" data-type="expense">支出</button>
-      <button class="seg-btn" data-type="income">收入</button>
-      <button class="seg-btn" data-type="transfer">轉帳</button>
+      <button class="seg-btn active" data-type="expense" data-i18n="expense">支出</button>
+      <button class="seg-btn" data-type="income" data-i18n="income">收入</button>
+      <button class="seg-btn" data-type="transfer" data-i18n="transfer">轉帳</button>
     </div>
     <span class="head-spacer"></span>
   </div>
@@ -173,8 +173,8 @@
 
     <div class="row-list">
       <div class="form-row" id="amountRow" style="cursor:default">
-        <span class="ric">💵</span><span class="rlab">金額</span>
-        <input id="amountInput" class="amount-input" type="text" inputmode="decimal" placeholder="金額" autocomplete="off">
+        <span class="ric">💵</span><span class="rlab" data-i18n="amount">金額</span>
+        <input id="amountInput" class="amount-input" type="text" inputmode="decimal" data-i18n-ph="amount" placeholder="金額" autocomplete="off">
         <span id="amountEval" class="amount-eval"></span>
         <button type="button" class="kbd-toggle" id="btnKeypadToggle" aria-label="計算鍵盤">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M7 13h.01M11 13h.01M15 13h.01M7 17h10"/></svg>
@@ -183,33 +183,34 @@
       <div id="addRows"></div>
     </div>
 
-    <!-- 手續費（轉帳） -->
     <div id="feeCard" class="row-list" hidden>
       <div class="form-row" style="cursor:default">
-        <span class="ric">🏳️</span><span class="rlab">手續費</span>
+        <span class="ric">🏳️</span><span class="rlab" data-i18n="fee">手續費</span>
         <span class="rval"></span>
         <label class="switch"><input type="checkbox" id="feeToggle"><span class="knob"></span></label>
       </div>
       <div id="feeFields" hidden>
         <div class="form-row" style="cursor:default">
-          <span class="ric">💵</span><span class="rlab">金額</span>
+          <span class="ric">💵</span><span class="rlab" data-i18n="amount">金額</span>
           <input id="feeAmount" class="fee-input" type="number" inputmode="decimal" min="0" step="0.01" placeholder="0">
         </div>
         <button type="button" class="form-row" data-row="feePayer">
-          <span class="ric">👤</span><span class="rlab">誰付的</span>
+          <span class="ric">👤</span><span class="rlab" data-i18n="whoPaid">誰付的</span>
           <span class="rval filled" id="feePayerVal"></span><span class="chev">›</span>
         </button>
       </div>
     </div>
 
     <div class="card memo-card">
-      <textarea id="addNote" class="memo-input" placeholder="備註⋯" rows="4"></textarea>
+      <textarea id="addNote" class="memo-input" data-i18n-ph="notePh" placeholder="備註⋯" rows="4"></textarea>
     </div>
+
+    <p id="lastUpdated" class="hint last-updated" hidden></p>
   </div>
 
   <div class="add-foot" id="addFoot">
-    <button id="btnSaveClose" class="btn btn-outline">儲存</button>
-    <button id="btnSaveContinue" class="btn btn-primary">儲存並繼續</button>
+    <button id="btnSaveClose" class="btn btn-outline" data-i18n="save">儲存</button>
+    <button id="btnSaveContinue" class="btn btn-primary" data-i18n="saveContinue">儲存並繼續</button>
   </div>
 
   <!-- 計算鍵盤 -->
@@ -218,7 +219,7 @@
       <button class="kp kp-fn" data-k="00">00</button>
       <button class="kp kp-fn" data-k="000">000</button>
       <span style="flex:1"></span>
-      <button class="kp kp-fn" id="kpDone">完成</button>
+      <button class="kp kp-fn" id="kpDone" data-i18n="done">完成</button>
     </div>
     <div class="keypad-grid">
       <button class="kp kp-op" data-k="÷">÷</button><button class="kp" data-k="1">1</button><button class="kp" data-k="2">2</button><button class="kp" data-k="3">3</button>
@@ -233,11 +234,9 @@
 <div id="searchPage" class="add-page" hidden>
   <div class="add-head">
     <button id="btnSearchClose" class="icon-btn icon-btn-plain" aria-label="關閉">✕</button>
-    <input id="searchInput" class="input search-input" type="search" placeholder="搜尋類別、備註、成員⋯">
+    <input id="searchInput" class="input search-input" type="search" data-i18n-ph="searchPh" placeholder="搜尋類別、備註、成員⋯">
   </div>
-  <div class="add-body" id="searchResults">
-    <div class="empty"><div class="big">🔍</div>輸入關鍵字搜尋全部歷史記錄</div>
-  </div>
+  <div class="add-body" id="searchResults"></div>
 </div>
 
 <!-- ============ 類別管理（整頁覆蓋） ============ -->
@@ -245,137 +244,156 @@
   <div class="add-head">
     <button id="btnCatClose" class="icon-btn icon-btn-plain" aria-label="關閉">✕</button>
     <div class="segmented seg-pill" id="segCatType">
-      <button class="seg-btn active" data-type="expense">支出</button>
-      <button class="seg-btn" data-type="income">收入</button>
+      <button class="seg-btn active" data-type="expense" data-i18n="expense">支出</button>
+      <button class="seg-btn" data-type="income" data-i18n="income">收入</button>
     </div>
     <span class="head-spacer"></span>
   </div>
   <div class="add-body">
     <div class="cat-tiles" id="catTiles"></div>
-    <p class="hint" style="text-align:center">點選類別即可編輯名稱與 emoji，或刪除</p>
+    <p class="hint" style="text-align:center" data-i18n="catHint">點選類別即可編輯名稱與 emoji、排序，或刪除</p>
+  </div>
+</div>
+
+<!-- ============ Reports 明細（整頁覆蓋） ============ -->
+<div id="repDetailPage" class="add-page" hidden>
+  <div class="add-head">
+    <button id="btnRepDetailClose" class="icon-btn icon-btn-plain" aria-label="關閉">✕</button>
+    <div class="page-title" id="repDetailTitle" style="flex:1;text-align:center"></div>
+    <span class="head-spacer"></span>
+  </div>
+  <div class="add-body">
+    <div class="month-summary card-flat" id="repDetailSummary"></div>
+    <div id="repDetailList"></div>
   </div>
 </div>
 
 <!-- 類別編輯 -->
 <dialog id="dlgCatEdit" class="dialog">
-  <h2 class="dialog-title" id="catEditTitle">編輯類別</h2>
+  <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
+  <h2 class="dialog-title" id="catEditTitle"></h2>
   <div class="field field-row">
     <div class="col" style="flex:0 0 88px">
       <label class="field-label" for="inpCatEmoji">Emoji</label>
       <input id="inpCatEmoji" class="input cat-emoji-input" maxlength="4" placeholder="📌">
     </div>
     <div class="col">
-      <label class="field-label" for="inpCatName">名稱</label>
-      <input id="inpCatName" class="input" maxlength="10" placeholder="類別名稱">
+      <label class="field-label" for="inpCatName" data-i18n="catName">名稱</label>
+      <input id="inpCatName" class="input" maxlength="14" data-i18n-ph="catNamePh" placeholder="類別名稱">
     </div>
   </div>
+  <div class="dialog-actions" id="catMoveRow">
+    <button id="btnCatFwd" class="btn btn-ghost" data-i18n="moveFwd">◀ 往前排</button>
+    <button id="btnCatBack" class="btn btn-ghost" data-i18n="moveBack">往後排 ▶</button>
+  </div>
   <div class="dialog-actions">
-    <button id="btnCatDelete" class="btn btn-danger">刪除</button>
-    <button id="btnCatCancel" class="btn btn-ghost">取消</button>
-    <button id="btnCatSave" class="btn btn-primary">儲存</button>
+    <button id="btnCatDelete" class="btn btn-danger" data-i18n="delete">刪除</button>
+    <button id="btnCatSave" class="btn btn-primary" data-i18n="save">儲存</button>
   </div>
 </dialog>
 
 <!-- 成員名稱 -->
 <dialog id="dlgMembers" class="dialog">
-  <h2 class="dialog-title">誰付的 — 成員名稱</h2>
+  <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
+  <h2 class="dialog-title" data-i18n="membersTitle">成員名稱</h2>
   <div class="field">
-    <label class="field-label" for="inpName1">你的名字</label>
+    <label class="field-label" for="inpName1" data-i18n="yourName">你的名字</label>
     <input id="inpName1" class="input" maxlength="8">
   </div>
   <div class="field">
-    <label class="field-label" for="inpName2">另一半的名字</label>
+    <label class="field-label" for="inpName2" data-i18n="partnerName">另一半的名字</label>
     <input id="inpName2" class="input" maxlength="8">
   </div>
   <div class="dialog-actions">
-    <button id="btnMembersCancel" class="btn btn-ghost">取消</button>
-    <button id="btnMembersSave" class="btn btn-primary">儲存</button>
+    <button id="btnMembersSave" class="btn btn-primary btn-block" data-i18n="save">儲存</button>
   </div>
 </dialog>
 
 <!-- 誰要分攤 -->
-<dialog id="dlgSplit" class="dialog sheet">
-  <h2 class="dialog-title">誰要分攤</h2>
+<dialog id="dlgSplit" class="dialog">
+  <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
+  <h2 class="dialog-title" data-i18n="whoSplit">誰要分攤</h2>
   <div class="field">
     <div id="splitWho" class="check-row"></div>
   </div>
   <div class="field">
-    <label class="field-label">分攤方式</label>
+    <label class="field-label" data-i18n="splitMode">分攤方式</label>
     <div class="segmented" id="segSplitMode">
-      <button class="seg-btn active" data-mode="even">平均分攤</button>
-      <button class="seg-btn" data-mode="custom">自訂金額</button>
+      <button class="seg-btn active" data-mode="even" data-i18n="evenSplit">平均分攤</button>
+      <button class="seg-btn" data-mode="custom" data-i18n="customSplit">自訂金額</button>
     </div>
     <div id="splitDetail" class="split-detail"></div>
   </div>
   <div class="dialog-actions">
-    <button id="btnSplitDone" class="btn btn-primary btn-block">完成</button>
+    <button id="btnSplitDone" class="btn btn-primary btn-block" data-i18n="done">完成</button>
   </div>
 </dialog>
 
-<!-- 選擇器（底部彈出） -->
-<dialog id="dlgPicker" class="dialog sheet">
+<!-- 選擇器（置中） -->
+<dialog id="dlgPicker" class="dialog">
+  <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
   <h2 class="dialog-title" id="pickerTitle"></h2>
   <div id="pickerBody"></div>
 </dialog>
 
-<!-- 記錄操作 -->
-<dialog id="dlgTxAction" class="dialog">
-  <h2 class="dialog-title" id="txActionTitle">這筆記錄</h2>
-  <div class="dialog-actions dialog-actions-col">
-    <button id="btnTxEdit" class="btn btn-ghost btn-block">編輯</button>
-    <button id="btnTxDelete" class="btn btn-danger btn-block">刪除</button>
-    <button id="btnTxCancel" class="btn btn-primary btn-block">取消</button>
+<!-- 刪除確認 -->
+<dialog id="dlgConfirmDel" class="dialog">
+  <h2 class="dialog-title" data-i18n="confirmDelTitle">確定要刪除嗎？</h2>
+  <p class="hint" id="delDesc" style="margin-top:0"></p>
+  <div class="dialog-actions">
+    <button id="btnDelCancel" class="btn btn-ghost" data-i18n="cancel">取消</button>
+    <button id="btnDelOk" class="btn btn-danger" data-i18n="delete">刪除</button>
   </div>
 </dialog>
 
 <!-- 雲端同步 -->
 <dialog id="dlgSync" class="dialog">
-  <h2 class="dialog-title">雲端即時同步</h2>
+  <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
+  <h2 class="dialog-title" data-i18n="syncTitle">雲端即時同步</h2>
   <div id="syncBody"></div>
 </dialog>
 
 <!-- 日期選擇器 -->
-<dialog id="dlgDate" class="dialog sheet">
+<dialog id="dlgDate" class="dialog">
+  <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
   <div class="dp-head">
     <button type="button" class="icon-btn" id="dpPrev" aria-label="上一個">‹</button>
     <div class="month-title month-title-btn" id="dpTitle"></div>
     <button type="button" class="icon-btn" id="dpNext" aria-label="下一個">›</button>
   </div>
-  <div class="cal-week" id="dpWeek">
-    <span>日</span><span>一</span><span>二</span><span>三</span><span>四</span><span>五</span><span>六</span>
-  </div>
+  <div class="cal-week" id="dpWeek"></div>
   <div class="cal-grid" id="dpGrid"></div>
   <div class="dp-cells" id="dpMonths" hidden></div>
   <div class="dp-cells" id="dpYears" hidden></div>
   <div class="dialog-actions" style="margin-top:14px">
-    <button type="button" id="dpYesterday" class="btn btn-ghost">昨天</button>
+    <button type="button" id="dpYesterday" class="btn btn-ghost" data-i18n="yesterday">昨天</button>
     <button type="button" id="dpToday" class="btn btn-ghost">今天</button>
-    <button type="button" id="dpCancel" class="btn btn-outline">取消</button>
+    <button type="button" id="dpCancel" class="btn btn-outline" data-i18n="cancel">取消</button>
   </div>
 </dialog>
 
 <!-- 自訂日期範圍 -->
 <dialog id="dlgRange" class="dialog">
-  <h2 class="dialog-title">日期範圍</h2>
+  <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
+  <h2 class="dialog-title" data-i18n="rangeTitle">日期範圍</h2>
   <div class="range-quick">
-    <button class="btn btn-ghost btn-block" data-quick="7">最近 7 天</button>
-    <button class="btn btn-ghost btn-block" data-quick="30">最近 30 天</button>
-    <button class="btn btn-ghost btn-block" data-quick="90">最近 90 天</button>
-    <button class="btn btn-ghost btn-block" data-quick="all">全部期間</button>
+    <button class="btn btn-ghost btn-block" data-quick="7" data-i18n="last7">最近 7 天</button>
+    <button class="btn btn-ghost btn-block" data-quick="30" data-i18n="last30">最近 30 天</button>
+    <button class="btn btn-ghost btn-block" data-quick="90" data-i18n="last90">最近 90 天</button>
+    <button class="btn btn-ghost btn-block" data-quick="all" data-i18n="allTimeRange">全部期間</button>
   </div>
   <div class="field field-row" style="margin-top:14px">
     <div class="col">
-      <label class="field-label" for="inpRangeStart">開始</label>
+      <label class="field-label" for="inpRangeStart" data-i18n="start">開始</label>
       <input id="inpRangeStart" type="date" class="input">
     </div>
     <div class="col">
-      <label class="field-label" for="inpRangeEnd">結束</label>
+      <label class="field-label" for="inpRangeEnd" data-i18n="end">結束</label>
       <input id="inpRangeEnd" type="date" class="input">
     </div>
   </div>
   <div class="dialog-actions">
-    <button id="btnRangeCancel" class="btn btn-ghost">取消</button>
-    <button id="btnRangeApply" class="btn btn-primary">套用</button>
+    <button id="btnRangeApply" class="btn btn-primary btn-block" data-i18n="apply">套用</button>
   </div>
 </dialog>
 
