@@ -82,6 +82,13 @@ const STR = {
     exported: '已匯出備份', imported: '匯入完成，共 {n} 筆', badFile: '檔案格式不正確',
     noEditLegacy: '此筆為舊格式，僅能左滑刪除',
     langSaved: '已切換為中文',
+    signIn: '登入', signUp: '首次使用？註冊帳號', signOut: '登出',
+    email: 'Email', password: '密碼',
+    signedInAs: '已登入：{email}',
+    loginHint: '啟用同步需先登入。只有被授權的帳號能使用這個資料庫，其他人即使打開這個網頁也無法讀寫。',
+    loginDone: '登入成功', loginFail: '登入失敗：{e}', signupDone: '帳號已建立並登入',
+    enterEmailPw: '請輸入 Email 與密碼', pwTooShort: '密碼至少 6 碼',
+    signedOut: '已登出',
   },
   en: {
     calendar: 'Calendar', list: 'List', io: 'In/Out', transfer: 'Transfer', all: 'All',
@@ -137,6 +144,13 @@ const STR = {
     exported: 'Backup exported', imported: 'Imported — {n} records total', badFile: 'Invalid file format',
     noEditLegacy: 'Legacy record — swipe left to delete',
     langSaved: 'Switched to English',
+    signIn: 'Sign in', signUp: 'First time? Create account', signOut: 'Sign out',
+    email: 'Email', password: 'Password',
+    signedInAs: 'Signed in: {email}',
+    loginHint: 'Sign in to enable sync. Only authorized accounts can use this database — strangers cannot read or write even with this page open.',
+    loginDone: 'Signed in', loginFail: 'Sign-in failed: {e}', signupDone: 'Account created & signed in',
+    enterEmailPw: 'Enter email and password', pwTooShort: 'Password must be 6+ characters',
+    signedOut: 'Signed out',
   },
 };
 const WEEK_ZH = ['日', '一', '二', '三', '四', '五', '六'];
@@ -1143,18 +1157,40 @@ function renderSyncDialog() {
     body.innerHTML = `
       <p class="hint" style="margin-top:0">${L('syncNAHint')}</p>
       <div class="dialog-actions"><button class="btn btn-primary btn-block" id="btnSyncClose">${L('gotIt')}</button></div>`;
+  } else if (!S.signedIn) {
+    body.innerHTML = `
+      <p class="hint" style="margin-top:0">${L('loginHint')}</p>
+      <div class="field" style="margin-bottom:10px">
+        <label class="field-label" for="inpSyncEmail">${L('email')}</label>
+        <input id="inpSyncEmail" class="input" type="email" inputmode="email" autocomplete="username" autocapitalize="none">
+      </div>
+      <div class="field" style="margin-bottom:10px">
+        <label class="field-label" for="inpSyncPw">${L('password')}</label>
+        <input id="inpSyncPw" class="input" type="password" autocomplete="current-password">
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-primary btn-block" id="btnSyncLogin">${L('signIn')}</button>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost btn-block" id="btnSyncSignup">${L('signUp')}</button>
+      </div>`;
   } else if (S.enabled) {
     body.innerHTML = `
       <p class="hint" style="margin-top:0">${L('syncOnHint')}</p>
       <div class="sync-code">${esc(S.roomId)}</div>
       <p class="hint">${L('syncCodeHint')}</p>
+      <p class="hint">${L('signedInAs', { email: esc(S.userEmail || '') })}</p>
       <div class="dialog-actions">
         <button class="btn btn-danger" id="btnSyncOff">${L('disconnect')}</button>
         <button class="btn btn-primary" id="btnSyncClose">${L('done')}</button>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost btn-block" id="btnSyncLogout">${L('signOut')}</button>
       </div>`;
   } else {
     body.innerHTML = `
       <p class="hint" style="margin-top:0">${L('syncSetupHint')}</p>
+      <p class="hint" style="margin-top:0">${L('signedInAs', { email: esc(S.userEmail || '') })}</p>
       <button class="btn btn-primary btn-block" id="btnSyncCreate" style="margin-bottom:14px">${L('createBook')}</button>
       <div class="field" style="margin-bottom:10px">
         <label class="field-label" for="inpSyncCode">${L('joinLabel')}</label>
@@ -1162,6 +1198,9 @@ function renderSyncDialog() {
       </div>
       <div class="dialog-actions">
         <button class="btn btn-primary btn-block" id="btnSyncJoin">${L('join')}</button>
+      </div>
+      <div class="dialog-actions">
+        <button class="btn btn-ghost btn-block" id="btnSyncLogout">${L('signOut')}</button>
       </div>`;
   }
 }
@@ -1653,6 +1692,31 @@ function bind() {
   $('#dlgSync').addEventListener('click', async (e) => {
     const S = window.Sync;
     if (e.target.closest('#btnSyncClose')) { $('#dlgSync').close(); return; }
+    if (e.target.closest('#btnSyncLogin') || e.target.closest('#btnSyncSignup')) {
+      const isSignup = !!e.target.closest('#btnSyncSignup');
+      const email = ($('#inpSyncEmail')?.value || '').trim();
+      const pw = $('#inpSyncPw')?.value || '';
+      if (!email || !pw) { toast(L('enterEmailPw')); return; }
+      if (pw.length < 6) { toast(L('pwTooShort')); return; }
+      try {
+        toast(L('connecting'));
+        if (isSignup) await S.signUp(email, pw);
+        else await S.signIn(email, pw);
+        renderSyncDialog();
+        renderSettings();
+        toast(isSignup ? L('signupDone') : L('loginDone'));
+      } catch (err) {
+        toast(L('loginFail', { e: (err.code || err.message || '').replace('auth/', '') }));
+      }
+      return;
+    }
+    if (e.target.closest('#btnSyncLogout')) {
+      try { await S.signOutUser(); } catch (err) { /* 忽略 */ }
+      renderSyncDialog();
+      renderSettings();
+      toast(L('signedOut'));
+      return;
+    }
     if (e.target.closest('#btnSyncCreate')) {
       try {
         toast(L('creating'));

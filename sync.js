@@ -1,5 +1,6 @@
-/* ================= 智賬 — 雲端即時同步（Firebase Firestore） =================
-   以「共享帳本配對碼」為單位同步：兩支手機輸入同一組配對碼即即時互通。
+/* ================= 智賬 — 雲端即時同步（Firebase Firestore + Auth） =================
+   以「共享帳本配對碼」為單位同步；Firestore 規則要求登入且 email 在白名單內，
+   陌生人即使拿到程式碼與網址也無法讀寫資料庫。
    此檔為 ES module；離線或未設定 FIREBASE_CONFIG 時載入失敗不影響主程式。 */
 
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
@@ -7,11 +8,17 @@ import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
   doc, setDoc, deleteDoc, collection, onSnapshot, writeBatch,
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import {
+  getAuth, onAuthStateChanged, signInWithEmailAndPassword,
+  createUserWithEmailAndPassword, signOut,
+} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
 
 const cfg = window.FIREBASE_CONFIG;
 const LSK = 'zhizhang.sync';
 
 let fs = null;
+let auth = null;
+let user = null;
 let roomId = null;
 let unsubs = [];
 let started = false;
@@ -20,7 +27,7 @@ const getState = () => { try { return JSON.parse(localStorage.getItem(LSK)) || {
 const setState = (s) => localStorage.setItem(LSK, JSON.stringify(s));
 
 function genCode(len = 8) {
-  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // 去除易混淆字元
+  const alphabet = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
   const buf = new Uint8Array(len);
   crypto.getRandomValues(buf);
   return [...buf].map((b) => alphabet[b % alphabet.length]).join('');
@@ -33,6 +40,7 @@ function ensureInit() {
     fs = initializeFirestore(app, {
       localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
     });
+    auth = getAuth(app);
   }
 }
 
@@ -86,6 +94,7 @@ function listen(id) {
 
 async function connect(id, { upload = false, withConfig = true } = {}) {
   ensureInit();
+  if (!user) throw new Error('請先登入');
   roomId = id;
   if (upload) await uploadLocal(id, { withConfig });
   listen(id);
@@ -93,11 +102,32 @@ async function connect(id, { upload = false, withConfig = true } = {}) {
   setState({ roomId: id });
 }
 
+function stopListening() {
+  unsubs.forEach((u) => u());
+  unsubs = [];
+  started = false;
+  roomId = null;
+}
+
 window.Sync = {
   get configured() { return !!cfg; },
   get enabled() { return started; },
+  get signedIn() { return !!user; },
+  get userEmail() { return user ? user.email : null; },
   get roomId() { return roomId; },
 
+  async signIn(email, pw) {
+    ensureInit();
+    await signInWithEmailAndPassword(auth, email, pw);
+  },
+  async signUp(email, pw) {
+    ensureInit();
+    await createUserWithEmailAndPassword(auth, email, pw);
+  },
+  async signOutUser() {
+    stopListening();
+    if (auth) await signOut(auth);
+  },
   async create() {
     const id = genCode(8);
     await connect(id, { upload: true });
@@ -124,18 +154,23 @@ window.Sync = {
     }, { merge: true }).catch((e) => console.warn('sync config:', e));
   },
   disconnect() {
-    unsubs.forEach((u) => u());
-    unsubs = [];
-    started = false;
-    roomId = null;
+    stopListening();
     setState({});
   },
 };
 
-// 之前配對過 → 自動重連
-const st = getState();
-if (cfg && st.roomId) {
-  connect(st.roomId).then(() => {
-    if (window.renderCurrentView) window.renderCurrentView();
-  }).catch((e) => console.warn('sync reconnect:', e));
+// 監聽登入狀態：登入後自動重連上次的共享帳本
+if (cfg) {
+  try {
+    ensureInit();
+    onAuthStateChanged(auth, (u) => {
+      user = u;
+      const st = getState();
+      if (u && st.roomId && !started) {
+        connect(st.roomId).then(() => window.renderCurrentView?.()).catch((e) => console.warn('sync reconnect:', e));
+      }
+      if (!u && started) stopListening();
+      window.renderSettings?.();
+    });
+  } catch (e) { console.warn('sync init:', e); }
 }
