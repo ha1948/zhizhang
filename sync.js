@@ -76,6 +76,7 @@ async function uploadLocal(id, { withConfig = true } = {}) {
     await setDoc(doc(fs, 'rooms', id, 'meta', 'config'), {
       members: window.db.members,
       categories: window.db.categories,
+      defaultPayer: window.db.defaultPayer || 'p1',
       updatedAt: Date.now(),
     }, { merge: true });
   }
@@ -108,11 +109,12 @@ function listen(id) {
   unsubs.push(onSnapshot(doc(fs, 'rooms', id, 'meta', 'config'), (snap) => {
     const d = snap.data();
     if (!d || !d.members) return;
-    const cur = JSON.stringify({ m: window.db.members, c: window.db.categories });
-    const inc = JSON.stringify({ m: d.members, c: d.categories });
+    const cur = JSON.stringify({ m: window.db.members, c: window.db.categories, p: window.db.defaultPayer });
+    const inc = JSON.stringify({ m: d.members, c: d.categories, p: d.defaultPayer || window.db.defaultPayer });
     if (cur !== inc) {
       window.db.members = d.members;
       if (d.categories) window.db.categories = d.categories;
+      if (d.defaultPayer) window.db.defaultPayer = d.defaultPayer;
       window.save();
       window.renderCurrentView();
     }
@@ -294,6 +296,7 @@ window.Sync = {
     if (started) setDoc(doc(fs, 'rooms', roomId, 'meta', 'config'), {
       members: window.db.members,
       categories: window.db.categories,
+      defaultPayer: window.db.defaultPayer || 'p1',
       updatedAt: Date.now(),
     }, { merge: true }).catch((e) => console.warn('sync config:', e));
   },

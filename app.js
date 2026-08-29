@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v21';
+const APP_VER = 'v22';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -63,7 +63,8 @@ const STR = {
     recorded: '已記錄 {amt}', updated: '已更新', enterAmount: '請輸入金額',
     samePerson: '轉出與轉入不能是同一人', splitNotEqual: '自訂分攤金額需等於總金額',
     selCategory: '選擇類別', whoPaidQ: '誰付的錢', whoReceivedQ: '誰收到的錢', feeWho: '手續費誰付的',
-    membersTitle: '成員名稱', yourName: '你的名字', partnerName: '另一半的名字', namesSaved: '已儲存名稱',
+    membersTitle: '成員名稱', member1: '成員一', member2: '成員二',
+    defaultPayer: '預設付款人', namesSaved: '已儲存名稱', thisYearBtn: '今年',
     catEditNew: '新增類別', catEdit: '編輯類別', catName: '名稱', catNamePh: '類別名稱',
     catSaved: '已儲存類別', catDeleted: '已刪除類別', catNameReq: '請輸入類別名稱',
     catDelUsed: '有 {n} 筆記錄使用「{name}」，刪除後這些記錄會顯示為「其他」。確定刪除？',
@@ -135,7 +136,8 @@ const STR = {
     recorded: 'Saved {amt}', updated: 'Updated', enterAmount: 'Enter an amount',
     samePerson: 'Sender and receiver must differ', splitNotEqual: 'Custom split must equal the total',
     selCategory: 'Choose category', whoPaidQ: 'Who paid', whoReceivedQ: 'Who received', feeWho: 'Who paid the fee',
-    membersTitle: 'Member names', yourName: 'Your name', partnerName: 'Partner\'s name', namesSaved: 'Names saved',
+    membersTitle: 'Member names', member1: 'Member 1', member2: 'Member 2',
+    defaultPayer: 'Default payer', namesSaved: 'Names saved', thisYearBtn: 'This year',
     catEditNew: 'New category', catEdit: 'Edit category', catName: 'Name', catNamePh: 'Category name',
     catSaved: 'Category saved', catDeleted: 'Category deleted', catNameReq: 'Enter a category name',
     catDelUsed: '{n} records use "{name}". They will show as "Other". Delete?',
@@ -197,6 +199,7 @@ function load() {
     d.categories = JSON.parse(JSON.stringify(DEFAULT_CATS));
   }
   if (d.lang !== 'en') d.lang = 'zh';
+  if (d.defaultPayer !== 'p2') d.defaultPayer = 'p1';
   migrate(d);
   return d;
 }
@@ -577,11 +580,12 @@ let dpValue = '';
 let dpOnPick = null;
 
 function openDp(opts) {
-  dpMode = opts.mode;
-  dpValue = opts.value || (dpMode === 'date' ? today() : thisMonth());
+  dpMode = opts.mode; // date | month | year
+  dpValue = opts.value || (dpMode === 'date' ? today() : dpMode === 'year' ? today().slice(0, 4) : thisMonth());
   dpOnPick = opts.onPick;
-  dpMonth = dpMode === 'date' ? dpValue.slice(0, 7) : dpValue;
-  dpView = dpMode === 'date' ? 'day' : 'month';
+  if (dpMode === 'date') { dpMonth = dpValue.slice(0, 7); dpView = 'day'; }
+  else if (dpMode === 'year') { dpMonth = dpValue + '-01'; dpYearBase = Number(dpValue) - 5; dpView = 'year'; }
+  else { dpMonth = dpValue; dpView = 'month'; }
   renderDp();
   $('#dlgDate').showModal();
 }
@@ -598,7 +602,7 @@ function renderDp() {
   $('#dpMonths').hidden = dpView !== 'month';
   $('#dpYears').hidden = dpView !== 'year';
   $('#dpYesterday').hidden = dpMode !== 'date';
-  $('#dpToday').textContent = dpMode === 'date' ? L('today') : L('thisMonthBtn');
+  $('#dpToday').textContent = dpMode === 'date' ? L('today') : dpMode === 'year' ? L('thisYearBtn') : L('thisMonthBtn');
 
   if (dpView === 'day') {
     $('#dpTitle').innerHTML = `${monthLabel(dpMonth)} <span class="caret">▾</span>`;
@@ -693,11 +697,11 @@ function openAdd(editTx = null) {
     form.type = 'expense';
     form.expr = '';
     form.category = (cats('expense')[0] || {}).id;
-    form.payer = 'p1';
-    form.from = 'p1';
-    form.to = 'p2';
+    form.payer = db.defaultPayer;
+    form.from = db.defaultPayer;
+    form.to = db.defaultPayer === 'p1' ? 'p2' : 'p1';
     form.feeOn = false;
-    form.feePayer = 'p1';
+    form.feePayer = db.defaultPayer;
     form.participants = { p1: true, p2: true };
     form.splitMode = 'even';
     form.custom = { p1: '', p2: '' };
@@ -998,7 +1002,7 @@ const repKeyOf = (t) => repKind === 'transfer' ? L('transferOut', { name: db.mem
 function renderReports() {
   $$('#segRepPeriod .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.period === repPeriod));
   $$('#repIOWrap .seg-btn').forEach((b) => b.classList.toggle('active', b.dataset.kind === repKind));
-  $('#repTitle').textContent = periodFilter().label;
+  $('#repTitle').innerHTML = `${esc(periodFilter().label)} <span class="caret">▾</span>`;
   const navVisible = repPeriod !== 'range';
   $('#repPrev').style.visibility = navVisible ? 'visible' : 'hidden';
   $('#repNext').style.visibility = navVisible ? 'visible' : 'hidden';
@@ -1204,6 +1208,16 @@ function doSettle(debtor) {
 ================================================== */
 let catPageType = 'expense';
 let editingCatId = null;
+
+let tmpDefPayer = 'p1';
+function renderDefPayerRow() {
+  const n1 = $('#inpName1').value.trim() || db.members.p1;
+  const n2 = $('#inpName2').value.trim() || db.members.p2;
+  $('#defPayerRow').innerHTML = [['p1', n1], ['p2', n2]].map(([p, n]) => `
+    <label class="check-pill ${tmpDefPayer === p ? 'checked' : ''}" data-def="${p}">
+      <span class="box">✓</span>${esc(n)}
+    </label>`).join('');
+}
 
 function renderSettings() {
   $('#setMembersVal').textContent = `${db.members.p1}、${db.members.p2}`;
@@ -1697,11 +1711,12 @@ function bind() {
   });
   $('#dpYears').addEventListener('click', (e) => {
     const b = e.target.closest('.dp-cell[data-year]'); if (!b) return;
+    if (dpMode === 'year') { dpApply(b.dataset.year); return; }
     dpMonth = b.dataset.year + dpMonth.slice(4);
     dpView = 'month';
     renderDp();
   });
-  $('#dpToday').addEventListener('click', () => dpApply(dpMode === 'date' ? today() : thisMonth()));
+  $('#dpToday').addEventListener('click', () => dpApply(dpMode === 'date' ? today() : dpMode === 'year' ? today().slice(0, 4) : thisMonth()));
   $('#dpYesterday').addEventListener('click', () => dpApply(shiftDate(today(), -1)));
   $('#dpCancel').addEventListener('click', () => $('#dlgDate').close());
 
@@ -1727,7 +1742,18 @@ function bind() {
   });
   $('#splitDetail').addEventListener('input', (e) => {
     const inp = e.target.closest('.custom-split'); if (!inp) return;
-    form.custom[inp.dataset.person] = inp.value;
+    const p = inp.dataset.person;
+    form.custom[p] = inp.value;
+    // 填一格，另一格自動帶入剩餘金額
+    const amount = formAmount();
+    const parts = ['p1', 'p2'].filter((x) => form.participants[x]);
+    if (amount > 0 && parts.length === 2) {
+      const other = p === 'p1' ? 'p2' : 'p1';
+      const v = parseFloat(inp.value);
+      form.custom[other] = isNaN(v) ? '' : String(round2(Math.max(0, amount - v)));
+      const otherInp = $(`#splitDetail .custom-split[data-person="${other}"]`);
+      if (otherInp) otherInp.value = form.custom[other];
+    }
     updateRemainHint();
   });
   $('#btnSplitDone').addEventListener('click', () => {
@@ -1830,17 +1856,27 @@ function bind() {
   });
 
   /* ---- Reports ---- */
+  function openRangeDlg() {
+    $('#inpRangeStart').value = repRange ? repRange.start : shiftDate(today(), -29);
+    $('#inpRangeEnd').value = repRange ? repRange.end : today();
+    $('#dlgRange').showModal();
+  }
   $('#segRepPeriod').addEventListener('click', (e) => {
     const b = e.target.closest('.seg-btn'); if (!b) return;
     const p = b.dataset.period;
-    if (p === 'range') {
-      $('#inpRangeStart').value = repRange ? repRange.start : shiftDate(today(), -29);
-      $('#inpRangeEnd').value = repRange ? repRange.end : today();
-      $('#dlgRange').showModal();
-      return;
-    }
+    if (p === 'range') { openRangeDlg(); return; }
     repPeriod = p;
     renderReports();
+  });
+  // 點報表標題 → 直接跳任意月／年／範圍
+  $('#repTitle').addEventListener('click', () => {
+    if (repPeriod === 'month') {
+      openDp({ mode: 'month', value: repMonth, onPick: (ym) => { repMonth = ym; renderReports(); } });
+    } else if (repPeriod === 'year') {
+      openDp({ mode: 'year', value: repYear, onPick: (y) => { repYear = String(y); renderReports(); } });
+    } else {
+      openRangeDlg();
+    }
   });
   $('#repPrev').addEventListener('click', () => {
     if (repPeriod === 'month') repMonth = shiftMonth(repMonth, -1);
@@ -1897,6 +1933,8 @@ function bind() {
     if (kind === 'members') {
       $('#inpName1').value = db.members.p1;
       $('#inpName2').value = db.members.p2;
+      tmpDefPayer = db.defaultPayer;
+      renderDefPayerRow();
       $('#dlgMembers').showModal();
     } else if (kind === 'categories') {
       catPageType = 'expense';
@@ -1912,9 +1950,16 @@ function bind() {
     else if (kind === 'csv') exportCSV();
     else if (kind === 'import') $('#fileImport').click();
   });
+  $('#defPayerRow').addEventListener('click', (e) => {
+    const pill = e.target.closest('.check-pill'); if (!pill) return;
+    e.preventDefault();
+    tmpDefPayer = pill.dataset.def;
+    renderDefPayerRow();
+  });
   $('#btnMembersSave').addEventListener('click', () => {
     db.members.p1 = $('#inpName1').value.trim() || (db.lang === 'en' ? 'Me' : '我');
     db.members.p2 = $('#inpName2').value.trim() || (db.lang === 'en' ? 'Partner' : '另一半');
+    db.defaultPayer = tmpDefPayer === 'p2' ? 'p2' : 'p1';
     save();
     syncConfig();
     $('#dlgMembers').close();

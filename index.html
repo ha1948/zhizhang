@@ -78,7 +78,7 @@
 
   <div class="month-nav" id="repNav">
     <button class="icon-btn" id="repPrev" aria-label="上一個">‹</button>
-    <div class="month-title" id="repTitle"></div>
+    <div class="month-title month-title-btn" id="repTitle" role="button" tabindex="0"></div>
     <button class="icon-btn" id="repNext" aria-label="下一個">›</button>
   </div>
 
@@ -306,12 +306,16 @@
   <button type="button" class="dialog-x" data-close aria-label="關閉">✕</button>
   <h2 class="dialog-title" data-i18n="membersTitle">成員名稱</h2>
   <div class="field">
-    <label class="field-label" for="inpName1" data-i18n="yourName">你的名字</label>
+    <label class="field-label" for="inpName1" data-i18n="member1">成員一</label>
     <input id="inpName1" class="input" maxlength="8">
   </div>
   <div class="field">
-    <label class="field-label" for="inpName2" data-i18n="partnerName">另一半的名字</label>
+    <label class="field-label" for="inpName2" data-i18n="member2">成員二</label>
     <input id="inpName2" class="input" maxlength="8">
+  </div>
+  <div class="field">
+    <label class="field-label" data-i18n="defaultPayer">預設付款人</label>
+    <div class="check-row" id="defPayerRow"></div>
   </div>
   <div class="dialog-actions">
     <button id="btnMembersSave" class="btn btn-primary btn-block" data-i18n="save">儲存</button>
