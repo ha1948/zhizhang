@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v24';
+const APP_VER = 'v25';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -368,8 +368,8 @@ function swEnd() {
   if (swMoved) swSuppressUntil = Date.now() + 400;
   swMoved = false;
 }
-document.addEventListener('touchstart', (e) => swStart(e.target, e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-document.addEventListener('touchmove', (e) => { swMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+document.addEventListener('touchstart', (e) => { if (e.touches && e.touches.length) swStart(e.target, e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
+document.addEventListener('touchmove', (e) => { if (e.touches && e.touches.length) swMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive: true });
 document.addEventListener('touchend', swEnd);
 // 滑鼠拖曳（桌面版也能左滑刪除）
 document.addEventListener('mousedown', (e) => { if (e.button === 0) swStart(e.target, e.clientX, e.clientY); });
@@ -450,6 +450,8 @@ function updateAmountUI() {
   const v = formAmount();
   $('#amountEval').textContent = hasOp && v ? '= ' + fmtN(v) : '';
   $('#amountRow').classList.toggle('active-row', keypadOpen);
+  const tg = $('#btnKeypadToggle');
+  if (tg) tg.classList.toggle('on', keypadOpen);
 }
 
 function splitSummary() {
@@ -712,7 +714,6 @@ function openAdd(editTx = null) {
   renderAddPage();
   $('#addPage').hidden = false;
   lockScroll();
-  if (!editTx) openKeypad(); // 新增記錄 → 直接展開計算機鍵盤
 }
 
 function closeAdd() {
@@ -1665,8 +1666,51 @@ function bind() {
     if (row) openPicker('feePayer');
   });
 
-  // 金額：點欄位直接開計算機鍵盤（不使用系統鍵盤）
-  $('#amountRow').addEventListener('click', () => { if (!keypadOpen) openKeypad(); });
+  // 金額：系統鍵盤打字 + 常駐運算列 + 計算機鍵盤，三者並存
+  $('#btnKeypadToggle').addEventListener('click', () => { keypadOpen ? closeKeypad() : openKeypad(); });
+  $('#amountInput').addEventListener('focus', () => { if (keypadOpen) closeKeypad(); });
+  $('#amountInput').addEventListener('input', (e) => {
+    const v = e.target.value
+      .replace(/[xX*]/g, '×').replace(/\//g, '÷').replace(/-/g, '−')
+      .replace(/[^0-9.+−×÷]/g, '');
+    if (e.target.value !== v) e.target.value = v;
+    form.expr = v;
+    const hasOp = /[+−×÷]/.test(v);
+    const val = formAmount();
+    $('#amountEval').textContent = hasOp && val ? '= ' + fmtN(val) : '';
+  });
+  // 運算列：touchstart + preventDefault 才不會讓 iOS 先把輸入框失焦、收鍵盤
+  const opBarPress = (e) => {
+    const b = e.target.closest('[data-op]'); if (!b) return;
+    e.preventDefault();
+    const inp = $('#amountInput');
+    const op = b.dataset.op;
+    const focused = document.activeElement === inp;
+    let start = focused ? (inp.selectionStart ?? inp.value.length) : inp.value.length;
+    let end = focused ? (inp.selectionEnd ?? start) : start;
+    let before = inp.value.slice(0, start);
+    const after = inp.value.slice(end);
+    if (op === '⌫') {
+      if (start === end && start > 0) before = before.slice(0, -1);
+      inp.value = before + after;
+      start = before.length;
+    } else {
+      if (before === '' && after === '') return; // 空值不先放運算符
+      if (start === end && /[+−×÷]$/.test(before)) before = before.slice(0, -1); // 連按 → 取代
+      inp.value = before + op + after;
+      start = before.length + op.length;
+    }
+    form.expr = inp.value;
+    if (focused) inp.setSelectionRange(start, start);
+    const hasOp = /[+−×÷]/.test(form.expr);
+    const val = formAmount();
+    $('#amountEval').textContent = hasOp && val ? '= ' + fmtN(val) : '';
+  };
+  $('#opBar').addEventListener('touchstart', opBarPress, { passive: false });
+  $('#opBar').addEventListener('mousedown', (e) => {
+    if (e.sourceCapabilities && e.sourceCapabilities.firesTouchEvents) return; // 觸控裝置已由 touchstart 處理
+    opBarPress(e);
+  });
 
   // 日期
   $('#addDateBtn').addEventListener('click', () => { closeKeypad(); openDatePicker(); });

@@ -176,10 +176,20 @@
     </div>
 
     <div class="row-list">
-      <div class="form-row" id="amountRow">
+      <div class="form-row" id="amountRow" style="cursor:default">
         <span class="ric">💵</span><span class="rlab" data-i18n="amount">金額</span>
-        <input id="amountInput" class="amount-input" type="text" inputmode="none" data-i18n-ph="amount" placeholder="金額" autocomplete="off" readonly>
+        <input id="amountInput" class="amount-input" type="text" inputmode="decimal" data-i18n-ph="amount" placeholder="金額" autocomplete="off">
         <span id="amountEval" class="amount-eval"></span>
+        <button type="button" class="kbd-toggle" id="btnKeypadToggle" aria-label="計算鍵盤">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="3"/><path d="M7 9h.01M11 9h.01M15 9h.01M7 13h.01M11 13h.01M15 13h.01M7 17h10"/></svg>
+        </button>
+      </div>
+      <div class="op-bar" id="opBar">
+        <button type="button" data-op="+">＋</button>
+        <button type="button" data-op="−">−</button>
+        <button type="button" data-op="×">×</button>
+        <button type="button" data-op="÷">÷</button>
+        <button type="button" data-op="⌫">⌫</button>
       </div>
       <div id="addRows"></div>
     </div>
