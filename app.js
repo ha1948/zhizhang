@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v22';
+const APP_VER = 'v23';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -1667,7 +1667,35 @@ function bind() {
 
   // 金額：手動輸入 + 計算鍵盤
   $('#btnKeypadToggle').addEventListener('click', () => { keypadOpen ? closeKeypad() : openKeypad(); });
-  $('#amountInput').addEventListener('focus', () => { if (keypadOpen) closeKeypad(); });
+  $('#amountInput').addEventListener('focus', () => {
+    if (keypadOpen) closeKeypad();
+    $('#opBar').hidden = false; // 系統鍵盤沒有運算符 → 顯示快捷列
+  });
+  $('#amountInput').addEventListener('blur', () => {
+    setTimeout(() => { if (document.activeElement !== $('#amountInput')) $('#opBar').hidden = true; }, 150);
+  });
+  $('#opBar').addEventListener('pointerdown', (e) => {
+    const b = e.target.closest('[data-op]'); if (!b) return;
+    e.preventDefault(); // 保持金額欄焦點、不收系統鍵盤
+    const inp = $('#amountInput');
+    const op = b.dataset.op;
+    let start = inp.selectionStart ?? inp.value.length;
+    let end = inp.selectionEnd ?? start;
+    let before = inp.value.slice(0, start);
+    const after = inp.value.slice(end);
+    if (op === '⌫') {
+      if (start === end && start > 0) before = before.slice(0, -1);
+      inp.value = before + after;
+      start = before.length;
+    } else {
+      if (start === end && /[+−×÷]$/.test(before)) before = before.slice(0, -1); // 連按運算符 → 取代
+      inp.value = before + op + after;
+      start = before.length + op.length;
+    }
+    inp.setSelectionRange(start, start);
+    inp.dispatchEvent(new Event('input', { bubbles: true }));
+    inp.focus();
+  });
   $('#amountInput').addEventListener('input', (e) => {
     const v = e.target.value
       .replace(/[xX*]/g, '×').replace(/\//g, '÷').replace(/-/g, '−')
