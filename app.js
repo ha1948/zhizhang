@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v27';
+const APP_VER = 'v28';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -47,6 +47,7 @@ const STR = {
     settingsTitle: '設定', whoPaid: '誰付的', catManage: '類別管理',
     exportData: '匯出資料', importData: '匯入資料', cloudSync: '雲端同步',
     csvExport: '匯出 CSV', csvExported: '已匯出 CSV',
+    checkUpdate: '檢查更新', updating: '更新中，即將重新載入⋯',
     trend: '每月趨勢', searchCapped: '僅顯示前 100 筆，請輸入更精確的關鍵字',
     amount: '金額', category: '類別', whoReceived: '誰收到', whoSplit: '誰要分攤',
     fromWho: '誰轉出', toWho: '轉給誰', fee: '手續費', notePh: '備註⋯',
@@ -120,6 +121,7 @@ const STR = {
     settingsTitle: 'Settings', whoPaid: 'Members', catManage: 'Categories',
     exportData: 'Export data', importData: 'Import data', cloudSync: 'Cloud sync',
     csvExport: 'Export CSV', csvExported: 'CSV exported',
+    checkUpdate: 'Check for updates', updating: 'Updating — reloading…',
     trend: 'Monthly trend', searchCapped: 'Showing first 100 — refine your search',
     amount: 'Amount', category: 'Category', whoReceived: 'Received by', whoSplit: 'Split between',
     fromWho: 'From', toWho: 'To', fee: 'Fee', notePh: 'Memo…',
@@ -1513,6 +1515,7 @@ function bindHSwipe(container, opts) {
   container.addEventListener('touchstart', (e) => {
     if (!e.touches || !e.touches.length) return;
     if (opts.within && !e.target.closest(opts.within)) return;
+    if (opts.except && e.target.closest(opts.except)) return;
     sx = e.touches[0].clientX;
     sy = e.touches[0].clientY;
     on = true;
@@ -2006,6 +2009,15 @@ function bind() {
     within: '#accMonthCard',
     onSwipe: (dir) => { accMonth = shiftMonth(accMonth, dir); renderAccounts(); },
   });
+  // Books 列表模式左右滑動換月（明細項目上滑動是刪除手勢，排除）
+  bindHSwipe($('#booksList'), {
+    except: '.tx-swipe',
+    onSwipe: (dir) => {
+      booksMonth = shiftMonth(booksMonth, dir);
+      selectedDay = booksMonth === thisMonth() ? today() : booksMonth + '-01';
+      renderBooks();
+    },
+  });
 
   // 日期範圍
   $('#dlgRange').addEventListener('click', (e) => {
@@ -2050,6 +2062,19 @@ function bind() {
     } else if (kind === 'export') exportData();
     else if (kind === 'csv') exportCSV();
     else if (kind === 'import') $('#fileImport').click();
+    else if (kind === 'update') {
+      // 強制更新：清除 service worker 與快取後重新載入（記帳資料不受影響）
+      toast(L('updating'));
+      (async () => {
+        try {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map((r) => r.unregister()));
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        } catch (err) { /* 盡力而為 */ }
+        location.reload();
+      })();
+    }
   });
   $('#defPayerRow').addEventListener('click', (e) => {
     const pill = e.target.closest('.check-pill'); if (!pill) return;
@@ -2199,7 +2224,13 @@ switchView('books');
 window.onSyncChanged = () => { if ($('#dlgSync').open) renderSyncDialog(); };
 
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
-  navigator.serviceWorker.register('sw.js').catch(() => {});
+  navigator.serviceWorker.register('sw.js').then((reg) => {
+    reg.update().catch(() => {});
+    // 每次回到前景都主動檢查更新
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') reg.update().catch(() => {});
+    });
+  }).catch(() => {});
   // 新版 service worker 接手時自動重新載入，讓更新在重開一次後即生效
   let swReloaded = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
