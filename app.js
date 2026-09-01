@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v25';
+const APP_VER = 'v26';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -706,7 +706,7 @@ function openAdd(editTx = null) {
     form.participants = { p1: true, p2: true };
     form.splitMode = 'even';
     form.custom = { p1: '', p2: '' };
-    form.date = today();
+    form.date = selectedDay || today(); // 帶入日曆目前選中的日期
     $('#addNote').value = '';
     $('#feeAmount').value = '';
     $('#lastUpdated').hidden = true;
@@ -874,22 +874,32 @@ function renderCalendar() {
   txs.forEach((t) => { (byDay[t.date] ||= []).push(t); });
 
   const cells = [];
-  const prevN = daysInMonth(shiftMonth(booksMonth, -1));
-  for (let i = 0; i < firstDow; i++) cells.push(`<span class="cal-day muted"><span class="num">${prevN - firstDow + 1 + i}</span></span>`);
+  const prevYm = shiftMonth(booksMonth, -1);
+  const nextYm = shiftMonth(booksMonth, 1);
+  const prevN = daysInMonth(prevYm);
   const tdy = today();
+  // 上個月的尾巴（灰字、可點擊直接跳月）
+  for (let i = 0; i < firstDow; i++) {
+    const d = prevN - firstDow + 1 + i;
+    cells.push(`<button type="button" class="cal-day muted" data-date="${prevYm}-${String(d).padStart(2, '0')}"><span class="num">${d}</span></button>`);
+  }
   for (let d = 1; d <= nDays; d++) {
     const ds = `${booksMonth}-${String(d).padStart(2, '0')}`;
     const dayTxs = byDay[ds] || [];
     const hasExp = dayTxs.some((t) => t.type === 'expense' || t.type === 'transfer');
     const hasInc = dayTxs.some((t) => t.type === 'income');
     const dots = (hasExp ? '<span class="cal-dot"></span>' : '') + (hasInc ? '<span class="cal-dot inc"></span>' : '');
+    const isToday = ds === tdy;
     cells.push(`
-      <button type="button" class="cal-day ${ds === selectedDay ? 'selected' : ''} ${ds === tdy ? 'today' : ''}" data-date="${ds}">
-        <span class="num">${d}</span><span class="cal-dots">${dots}</span>
+      <button type="button" class="cal-day ${ds === selectedDay ? 'selected' : ''} ${isToday ? 'today' : ''}" data-date="${ds}">
+        <span class="num ${isToday ? 'today-lab' : ''}">${isToday ? L('today') : d}</span><span class="cal-dots">${dots}</span>
       </button>`);
   }
+  // 下個月的開頭（灰字、可點擊直接跳月）
   const trailing = (7 - (cells.length % 7)) % 7;
-  for (let i = 1; i <= trailing; i++) cells.push(`<span class="cal-day muted"><span class="num">${i}</span></span>`);
+  for (let i = 1; i <= trailing; i++) {
+    cells.push(`<button type="button" class="cal-day muted" data-date="${nextYm}-${String(i).padStart(2, '0')}"><span class="num">${i}</span></button>`);
+  }
   $('#calGrid').innerHTML = cells.join('');
 
   const dayTxs = (selectedDay.startsWith(booksMonth) ? (byDay[selectedDay] || []) : []);
@@ -1816,9 +1826,32 @@ function bind() {
   });
   $('#calGrid').addEventListener('click', (e) => {
     const d = e.target.closest('.cal-day[data-date]'); if (!d) return;
-    selectedDay = d.dataset.date;
-    renderCalendar();
+    const ds = d.dataset.date;
+    selectedDay = ds;
+    if (!ds.startsWith(booksMonth)) { booksMonth = ds.slice(0, 7); renderBooks(); } // 點到前後月 → 直接切換
+    else renderCalendar();
   });
+  // 日曆左右滑動切換月份
+  let calSwX = 0, calSwY = 0, calSwOn = false;
+  const calCard = $('#booksCalendar .cal-card');
+  calCard.addEventListener('touchstart', (e) => {
+    if (!e.touches || !e.touches.length) return;
+    calSwX = e.touches[0].clientX;
+    calSwY = e.touches[0].clientY;
+    calSwOn = true;
+  }, { passive: true });
+  calCard.addEventListener('touchend', (e) => {
+    if (!calSwOn) return;
+    calSwOn = false;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - calSwX, dy = t.clientY - calSwY;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+      booksMonth = shiftMonth(booksMonth, dx < 0 ? 1 : -1);
+      selectedDay = booksMonth === thisMonth() ? today() : booksMonth + '-01';
+      renderBooks();
+    }
+  }, { passive: true });
   $('#booksMonthTitle').addEventListener('click', () => {
     openDp({
       mode: 'month',
