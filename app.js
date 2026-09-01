@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v26';
+const APP_VER = 'v27';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -1184,7 +1184,7 @@ function renderAccounts() {
       <h2 class="card-title">${L('allTime')}</h2>
       ${detail}
     </div>
-    <div class="card">
+    <div class="card" id="accMonthCard">
       <h2 class="card-title">${L('monthStats')}</h2>
       <div class="dp-head" style="margin:2px 0 6px">
         <button type="button" class="icon-btn" id="accPrev" aria-label="上個月">‹</button>
@@ -1505,6 +1505,26 @@ function applyLang() {
   $$('[data-i18n-ph]').forEach((el) => { el.placeholder = L(el.dataset.i18nPh); });
   $('#calWeek').innerHTML = weekHeaderHTML();
   $('#dpWeek').innerHTML = weekHeaderHTML();
+}
+
+/* ----- 通用：水平滑動換月 ----- */
+function bindHSwipe(container, opts) {
+  let sx = 0, sy = 0, on = false;
+  container.addEventListener('touchstart', (e) => {
+    if (!e.touches || !e.touches.length) return;
+    if (opts.within && !e.target.closest(opts.within)) return;
+    sx = e.touches[0].clientX;
+    sy = e.touches[0].clientY;
+    on = true;
+  }, { passive: true });
+  container.addEventListener('touchend', (e) => {
+    if (!on) return;
+    on = false;
+    const t = e.changedTouches && e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) opts.onSwipe(dx < 0 ? 1 : -1);
+  }, { passive: true });
 }
 
 /* ==================================================
@@ -1971,6 +1991,21 @@ function bind() {
     if (row) openRepDetail(row.dataset.key);
   });
   $('#btnRepDetailClose').addEventListener('click', closeRepDetail);
+
+  // Reports 圓餅圖／排行榜區左右滑動換月（年檢視則換年）
+  bindHSwipe($('#repBody'), {
+    onSwipe: (dir) => {
+      if (repPeriod === 'month') repMonth = shiftMonth(repMonth, dir);
+      else if (repPeriod === 'year') repYear = String(Number(repYear) + dir);
+      else return;
+      renderReports();
+    },
+  });
+  // Accounts 月份統計卡片左右滑動換月
+  bindHSwipe($('#accountsBody'), {
+    within: '#accMonthCard',
+    onSwipe: (dir) => { accMonth = shiftMonth(accMonth, dir); renderAccounts(); },
+  });
 
   // 日期範圍
   $('#dlgRange').addEventListener('click', (e) => {
