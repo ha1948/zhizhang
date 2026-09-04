@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v36';
+const APP_VER = 'v37';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -42,6 +42,8 @@ const STR = {
     sdSection: '{a} 代墊 → {b} 應負擔', sdSub: '小計', sdNet: '兩者差額',
     sdSinceLast: '統計範圍：上次結清（{date}）之後', sdAllTime: '統計範圍：全部記錄',
     sdEarlier: '更早期間結轉', sdToSettle: '應結清',
+    sdEarlierHint: '結轉＝當時差額 − 結清金額。常見原因：結清時多轉或少轉、結清後才修改或補記更早的紀錄。點下方列可查該次結清。',
+    sdDiffThen: '當時差額', sdNoPeriod: '找不到對應的結清紀錄（可能是結清後修改了更早的紀錄）',
     needPay: '{a} 需要給 {b}', allClear: '✓ 目前互不相欠', keepGoing: '繼續好好記帳吧',
     settle: '結清', settleDone: '已結清：{a} 轉給 {b} {amt}',
     accountsHint: '按「結清」會自動新增一筆今天的轉帳記錄',
@@ -120,6 +122,8 @@ const STR = {
     sdSection: '{a} fronted → {b} owes', sdSub: 'Subtotal', sdNet: 'Difference',
     sdSinceLast: 'Period: since last settlement ({date})', sdAllTime: 'Period: all records',
     sdEarlier: 'Carried over from earlier', sdToSettle: 'To settle',
+    sdEarlierHint: 'Carry-over = difference at the time − amount settled. Usually the settled amount differed from the exact balance, or earlier records were edited after settling. Tap a row to inspect that settlement.',
+    sdDiffThen: 'Difference then', sdNoPeriod: 'No matching settlement found (an earlier record may have been edited after settling)',
     needPay: '{a} owes {b}', allClear: '✓ All settled', keepGoing: 'Keep up the good bookkeeping',
     settle: 'Settle up', settleDone: 'Settled: {a} → {b} {amt}',
     accountsHint: '"Settle up" adds a transfer record dated today.',
@@ -1267,6 +1271,25 @@ function openSettleDetail(debtor) {
   const net = round2(sumA - sumB);
   const earlier = round2(outstanding - net);
 
+  // 更早期間結轉的來源：逐次結清比對「當時差額」與「結清金額」
+  const periods = [];
+  let prevAt = -1;
+  transfers.forEach((tr) => {
+    let diff = 0;
+    db.txs.forEach((t) => {
+      if (t.type !== 'expense' || !t.split) return;
+      const ca = t.createdAt || 0;
+      if (ca > prevAt && ca <= (tr.createdAt || 0)) {
+        if (t.payer === creditor) diff += t.split[debtor] || 0;
+        else if (t.payer === debtor) diff -= t.split[creditor] || 0;
+      }
+    });
+    const signed = tr.from === debtor ? tr.amount : -tr.amount;
+    periods.push({ tr, diff: round2(diff), leftover: round2(diff - signed) });
+    prevAt = tr.createdAt || 0;
+  });
+  const oddPeriods = periods.filter((p) => Math.abs(p.leftover) >= 0.01);
+
   const secHTML = (title, obj, sum) => `
     <h2 class="card-title" style="margin:14px 0 4px">${title}</h2>
     ${Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([n, v]) =>
@@ -1278,7 +1301,17 @@ function openSettleDetail(debtor) {
     ${secHTML(L('sdSection', { a: esc(db.members[creditor]), b: esc(db.members[debtor]) }), secA, sumA)}
     ${secHTML(L('sdSection', { a: esc(db.members[debtor]), b: esc(db.members[creditor]) }), secB, sumB)}
     <div class="person-row" style="margin-top:8px"><span><b>${L('sdNet')}</b></span><span class="amt">${fmtN(net)}</span></div>
-    ${Math.abs(earlier) >= 0.01 ? `<div class="person-row"><span>${L('sdEarlier')}</span><span class="amt">${fmtN(earlier)}</span></div>` : ''}
+    ${Math.abs(earlier) >= 0.01 ? `
+      <div class="person-row" id="sdEarlierRow" style="cursor:pointer"><span>${L('sdEarlier')} <span style="opacity:.55">▾</span></span><span class="amt">${fmtN(earlier)}</span></div>
+      <div id="sdEarlierDetail" hidden>
+        <p class="hint" style="margin:6px 0">${esc(L('sdEarlierHint'))}</p>
+        ${oddPeriods.map((p) => `
+          <div class="person-row sd-period" data-txid="${p.tr.id}" style="cursor:pointer;font-size:14px">
+            <span>${p.tr.date}　${esc(db.members[p.tr.from])} → ${esc(db.members[p.tr.to])} ${fmtN(p.tr.amount)}<br>
+            <span class="hint">${L('sdDiffThen')} ${fmtN(p.diff)}</span></span>
+            <span class="amt">${fmtN(p.leftover)}</span>
+          </div>`).join('') || `<p class="hint" style="margin:4px 0">${esc(L('sdNoPeriod'))}</p>`}
+      </div>` : ''}
     <div class="person-row"><span><b>${L('sdToSettle')}</b></span><span class="amt" style="color:var(--accent)"><b>${fmtN(outstanding)}</b></span></div>`;
 
   // 純文字版（複製到私人記帳用）
@@ -1292,7 +1325,10 @@ function openSettleDetail(debtor) {
   Object.entries(secB).sort((a, b) => b[1] - a[1]).forEach(([n, v]) => lines.push(`  ${n}: ${fmtN(v)}`));
   lines.push(`  ${L('sdSub')}: ${fmtN(sumB)}`);
   lines.push(`${L('sdNet')}: ${fmtN(net)}`);
-  if (Math.abs(earlier) >= 0.01) lines.push(`${L('sdEarlier')}: ${fmtN(earlier)}`);
+  if (Math.abs(earlier) >= 0.01) {
+    lines.push(`${L('sdEarlier')}: ${fmtN(earlier)}`);
+    oddPeriods.forEach((p) => lines.push(`  ${p.tr.date} ${db.members[p.tr.from]} → ${db.members[p.tr.to]} ${fmtN(p.tr.amount)}（${L('sdDiffThen')} ${fmtN(p.diff)}）: ${fmtN(p.leftover)}`));
+  }
   lines.push(`${L('sdToSettle')}: ${fmtN(outstanding)}`);
   sdCopyText = lines.join('\n');
 
@@ -1737,7 +1773,7 @@ function bind() {
     if (name === curView) {
       // 已在此分頁 → 再點一次回到當月
       if (name === 'books') { booksMonth = thisMonth(); selectedDay = today(); renderBooks(); }
-      else if (name === 'reports') { repPeriod = 'month'; repMonth = thisMonth(); renderReports(); }
+      else if (name === 'reports') { repPeriod = 'month'; repMonth = thisMonth(); repMember = 'all'; renderReports(); }
       else if (name === 'accounts') { accMonth = thisMonth(); renderAccounts(); }
       return;
     }
@@ -1750,6 +1786,20 @@ function bind() {
     d.addEventListener('click', (e) => {
       if (e.target === d || e.target.closest('[data-close]')) d.close();
     });
+  });
+
+  /* ---- 結清對帳明細：展開結轉來源 / 點擊查看該筆結清 ---- */
+  $('#settleDetailBody').addEventListener('click', (e) => {
+    const row = e.target.closest('.sd-period');
+    if (row) {
+      const tx = db.txs.find((t) => t.id === row.dataset.txid);
+      if (tx) { $('#dlgSettleDetail').close(); openAdd(tx); }
+      return;
+    }
+    if (e.target.closest('#sdEarlierRow')) {
+      const d = $('#sdEarlierDetail');
+      if (d) d.hidden = !d.hidden;
+    }
   });
 
   /* ---- 結清對帳明細：複製 ---- */
