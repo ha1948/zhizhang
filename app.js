@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v34';
+const APP_VER = 'v35';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -305,10 +305,11 @@ function txSubtitle(tx) {
   return `${payerTxt} · ${splitTxt}`;
 }
 
-function txItemHTML(tx, { showDate = false } = {}) {
+function txItemHTML(tx, { showDate = false, amountOverride } = {}) {
   const c = catOf(tx);
   const sign = tx.type === 'income' ? '+' : tx.type === 'expense' ? '−' : '';
   const datePrefix = showDate ? `${Number(tx.date.slice(5, 7))}/${Number(tx.date.slice(8))} · ` : '';
+  const shown = amountOverride !== undefined ? amountOverride : tx.amount;
   return `
     <div class="tx-swipe">
       <button type="button" class="tx-del" data-delid="${tx.id}">${L('delete')}</button>
@@ -318,7 +319,7 @@ function txItemHTML(tx, { showDate = false } = {}) {
           <div class="tx-title">${esc(c.name)}${tx.note ? ' · ' + esc(tx.note) : ''}</div>
           <div class="tx-sub">${datePrefix}${txSubtitle(tx)}</div>
         </div>
-        <div class="tx-amount ${tx.type}">${sign}${fmtN(tx.amount)}</div>
+        <div class="tx-amount ${tx.type}">${sign}${fmtN(shown)}</div>
       </div>
     </div>`;
 }
@@ -1141,7 +1142,10 @@ function renderRepDetail() {
     <div>${L('total')}<b>${fmtN(total)}</b></div>
     <div>${txs.length} ${db.lang === 'en' ? 'records' : '筆'}</div>`;
   $('#repDetailList').innerHTML = txs.length
-    ? txs.map((t) => txItemHTML(t, { showDate: true })).join('')
+    ? txs.map((t) => txItemHTML(t, {
+        showDate: true,
+        amountOverride: repMember === 'all' ? undefined : repAmtOf(t), // 單人模式顯示該成員的分攤金額
+      })).join('')
     : `<div class="empty">${L('repEmpty', { k: L(repKind) })}</div>`;
   if (!txs.length && !$('#repDetailPage').hidden) closeRepDetail();
 }
