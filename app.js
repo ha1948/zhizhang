@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v35';
+const APP_VER = 'v36';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -38,6 +38,10 @@ const STR = {
     searchFound: '找到 {n} 筆', searchNone: '沒有符合「{q}」的記錄',
     accountsTitle: '成員結算', allTime: '累計統計', monthStats: '月份統計',
     totalSpent: '總花費', subtotal: '合計', bothSum: '兩人合計', pickMember: '選擇檢視對象',
+    settleDetail: '結清對帳明細', copyDetail: '複製明細', copied: '已複製',
+    sdSection: '{a} 代墊 → {b} 應負擔', sdSub: '小計', sdNet: '兩者差額',
+    sdSinceLast: '統計範圍：上次結清（{date}）之後', sdAllTime: '統計範圍：全部記錄',
+    sdEarlier: '更早期間結轉', sdToSettle: '應結清',
     needPay: '{a} 需要給 {b}', allClear: '✓ 目前互不相欠', keepGoing: '繼續好好記帳吧',
     settle: '結清', settleDone: '已結清：{a} 轉給 {b} {amt}',
     accountsHint: '按「結清」會自動新增一筆今天的轉帳記錄',
@@ -112,6 +116,10 @@ const STR = {
     searchFound: '{n} results', searchNone: 'No records match "{q}"',
     accountsTitle: 'Settlement', allTime: 'All-time', monthStats: 'Monthly stats',
     totalSpent: 'Total spent', subtotal: 'Total', bothSum: 'Combined', pickMember: 'View as',
+    settleDetail: 'Settlement breakdown', copyDetail: 'Copy breakdown', copied: 'Copied',
+    sdSection: '{a} fronted → {b} owes', sdSub: 'Subtotal', sdNet: 'Difference',
+    sdSinceLast: 'Period: since last settlement ({date})', sdAllTime: 'Period: all records',
+    sdEarlier: 'Carried over from earlier', sdToSettle: 'To settle',
     needPay: '{a} owes {b}', allClear: '✓ All settled', keepGoing: 'Keep up the good bookkeeping',
     settle: 'Settle up', settleDone: 'Settled: {a} → {b} {amt}',
     accountsHint: '"Settle up" adds a transfer record dated today.',
@@ -1182,7 +1190,10 @@ function renderAccounts() {
     hero = `<div class="card settle-hero">
       <div class="who">${L('needPay', { a: esc(db.members[debtor]), b: esc(db.members[creditor]) })}</div>
       <div class="amt">${fmt(Math.abs(bal[debtor]))}</div>
-      <button id="btnSettle" class="btn btn-primary" data-debtor="${debtor}">${L('settle')}</button>
+      <div class="dialog-actions" style="max-width:280px;margin:0 auto">
+        <button id="btnSettleDetail" class="btn btn-ghost" data-debtor="${debtor}">${L('settleDetail')}</button>
+        <button id="btnSettle" class="btn btn-primary" data-debtor="${debtor}">${L('settle')}</button>
+      </div>
     </div>`;
   }
 
@@ -1224,6 +1235,68 @@ function renderAccounts() {
       ${monthDetail}
     </div>
     <p class="hint" style="text-align:center">${L('accountsHint')}</p>`;
+}
+
+/* ----- 結清對帳明細：把應結清金額按類別拆解 ----- */
+let sdCopyText = '';
+function openSettleDetail(debtor) {
+  const creditor = debtor === 'p1' ? 'p2' : 'p1';
+  const outstanding = Math.abs(balances()[debtor]);
+
+  // 統計範圍：最近一次成員間轉帳（通常是上次結清）之後
+  const transfers = db.txs.filter((t) => t.type === 'transfer' && t.from && t.to && !t.legacy)
+    .sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+  const last = transfers[transfers.length - 1];
+  const sinceTxt = last ? L('sdSinceLast', { date: last.date }) : L('sdAllTime');
+
+  const inScope = db.txs.filter((t) => t.type === 'expense' && t.split &&
+    (!last || (t.createdAt || 0) > (last.createdAt || 0)));
+
+  const catName = (t) => { const c = catOf(t); return `${c.icon} ${c.name}`; };
+  const secA = {}; let sumA = 0; // 對方代墊 → debtor 應負擔
+  const secB = {}; let sumB = 0; // debtor 代墊 → 對方應負擔
+  inScope.forEach((t) => {
+    if (t.payer === creditor && (t.split[debtor] || 0) > 0) {
+      secA[catName(t)] = (secA[catName(t)] || 0) + t.split[debtor];
+      sumA += t.split[debtor];
+    } else if (t.payer === debtor && (t.split[creditor] || 0) > 0) {
+      secB[catName(t)] = (secB[catName(t)] || 0) + t.split[creditor];
+      sumB += t.split[creditor];
+    }
+  });
+  const net = round2(sumA - sumB);
+  const earlier = round2(outstanding - net);
+
+  const secHTML = (title, obj, sum) => `
+    <h2 class="card-title" style="margin:14px 0 4px">${title}</h2>
+    ${Object.entries(obj).sort((a, b) => b[1] - a[1]).map(([n, v]) =>
+      `<div class="person-row"><span>${esc(n)}</span><span class="amt">${fmtN(v)}</span></div>`).join('') || `<div class="hint" style="margin:4px 0">—</div>`}
+    <div class="person-row"><span><b>${L('sdSub')}</b></span><span class="amt">${fmtN(sum)}</span></div>`;
+
+  $('#settleDetailBody').innerHTML = `
+    <p class="hint" style="margin-top:0">${esc(sinceTxt)}</p>
+    ${secHTML(L('sdSection', { a: esc(db.members[creditor]), b: esc(db.members[debtor]) }), secA, sumA)}
+    ${secHTML(L('sdSection', { a: esc(db.members[debtor]), b: esc(db.members[creditor]) }), secB, sumB)}
+    <div class="person-row" style="margin-top:8px"><span><b>${L('sdNet')}</b></span><span class="amt">${fmtN(net)}</span></div>
+    ${Math.abs(earlier) >= 0.01 ? `<div class="person-row"><span>${L('sdEarlier')}</span><span class="amt">${fmtN(earlier)}</span></div>` : ''}
+    <div class="person-row"><span><b>${L('sdToSettle')}</b></span><span class="amt" style="color:var(--accent)"><b>${fmtN(outstanding)}</b></span></div>`;
+
+  // 純文字版（複製到私人記帳用）
+  const lines = [];
+  lines.push(`${L('settleDetail')} ${today()}`);
+  lines.push(sinceTxt);
+  lines.push(`${L('sdSection', { a: db.members[creditor], b: db.members[debtor] })}`);
+  Object.entries(secA).sort((a, b) => b[1] - a[1]).forEach(([n, v]) => lines.push(`  ${n}: ${fmtN(v)}`));
+  lines.push(`  ${L('sdSub')}: ${fmtN(sumA)}`);
+  lines.push(`${L('sdSection', { a: db.members[debtor], b: db.members[creditor] })}`);
+  Object.entries(secB).sort((a, b) => b[1] - a[1]).forEach(([n, v]) => lines.push(`  ${n}: ${fmtN(v)}`));
+  lines.push(`  ${L('sdSub')}: ${fmtN(sumB)}`);
+  lines.push(`${L('sdNet')}: ${fmtN(net)}`);
+  if (Math.abs(earlier) >= 0.01) lines.push(`${L('sdEarlier')}: ${fmtN(earlier)}`);
+  lines.push(`${L('sdToSettle')}: ${fmtN(outstanding)}`);
+  sdCopyText = lines.join('\n');
+
+  $('#dlgSettleDetail').showModal();
 }
 
 function doSettle(debtor) {
@@ -1675,8 +1748,24 @@ function bind() {
   // 所有 dialog：點背景關閉 + ✕ 按鈕
   $$('dialog').forEach((d) => {
     d.addEventListener('click', (e) => {
-      if (e.target === d || e.target.closest('.dialog-x')) d.close();
+      if (e.target === d || e.target.closest('[data-close]')) d.close();
     });
+  });
+
+  /* ---- 結清對帳明細：複製 ---- */
+  $('#btnSdCopy').addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(sdCopyText);
+      toast(L('copied'));
+    } catch (e) {
+      const ta = document.createElement('textarea');
+      ta.value = sdCopyText;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      ta.remove();
+      toast(L('copied'));
+    }
   });
 
   /* ---- 記一筆 ---- */
@@ -1966,6 +2055,8 @@ function bind() {
   $('#accountsBody').addEventListener('click', (e) => {
     const b = e.target.closest('#btnSettle');
     if (b) { doSettle(b.dataset.debtor); return; }
+    const sd = e.target.closest('#btnSettleDetail');
+    if (sd) { openSettleDetail(sd.dataset.debtor); return; }
     if (e.target.closest('#accPrev')) { accMonth = shiftMonth(accMonth, -1); renderAccounts(); return; }
     if (e.target.closest('#accNext')) { accMonth = shiftMonth(accMonth, 1); renderAccounts(); return; }
     if (e.target.closest('#accMonthTitle')) {
