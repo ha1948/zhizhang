@@ -73,7 +73,7 @@
       <button class="seg-btn" data-period="year" data-i18n="repYear">年</button>
       <button class="seg-btn" data-period="range" data-i18n="repRange">範圍</button>
     </div>
-    <span class="head-spacer"></span>
+    <button type="button" id="repMemberBtn" class="btn btn-ghost btn-sm rep-member-btn"></button>
   </div>
 
   <div class="month-nav" id="repNav">
@@ -82,12 +82,11 @@
     <button class="icon-btn" id="repNext" aria-label="下一個">›</button>
   </div>
 
-  <div id="repIOWrap" class="segmented" style="margin-bottom:10px">
+  <div id="repIOWrap" class="segmented" style="margin-bottom:14px">
     <button class="seg-btn active" data-kind="expense" data-i18n="expense">支出</button>
     <button class="seg-btn" data-kind="income" data-i18n="income">收入</button>
     <button class="seg-btn" data-kind="transfer" data-i18n="transfer">轉帳</button>
   </div>
-  <div id="repMemberWrap" class="segmented" style="margin-bottom:14px"></div>
 
   <div id="repBody"></div>
 </section>

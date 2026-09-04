@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v29';
+const APP_VER = 'v30';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -37,7 +37,7 @@ const STR = {
     searchPh: '搜尋類別、備註、成員⋯', searchHint: '輸入關鍵字搜尋全部歷史記錄',
     searchFound: '找到 {n} 筆', searchNone: '沒有符合「{q}」的記錄',
     accountsTitle: '成員結算', allTime: '累計統計', monthStats: '月份統計',
-    totalSpent: '總花費', subtotal: '合計', bothSum: '兩人合計',
+    totalSpent: '總花費', subtotal: '合計', bothSum: '兩人合計', pickMember: '選擇檢視對象',
     needPay: '{a} 需要給 {b}', allClear: '✓ 目前互不相欠', keepGoing: '繼續好好記帳吧',
     settle: '結清', settleDone: '已結清：{a} 轉給 {b} {amt}',
     accountsHint: '按「結清」會自動新增一筆今天的轉帳記錄',
@@ -111,7 +111,7 @@ const STR = {
     searchPh: 'Search category, note, member…', searchHint: 'Type keywords to search all history',
     searchFound: '{n} results', searchNone: 'No records match "{q}"',
     accountsTitle: 'Settlement', allTime: 'All-time', monthStats: 'Monthly stats',
-    totalSpent: 'Total spent', subtotal: 'Total', bothSum: 'Combined',
+    totalSpent: 'Total spent', subtotal: 'Total', bothSum: 'Combined', pickMember: 'View as',
     needPay: '{a} owes {b}', allClear: '✓ All settled', keepGoing: 'Keep up the good bookkeeping',
     settle: 'Settle up', settleDone: 'Settled: {a} → {b} {amt}',
     accountsHint: '"Settle up" adds a transfer record dated today.',
@@ -837,6 +837,11 @@ function openPicker(kind) {
       <button class="chip ${db.lang !== 'en' ? 'active' : ''}" data-val="zh">中文</button>
       <button class="chip ${db.lang === 'en' ? 'active' : ''}" data-val="en">English</button>
     </div>`;
+  } else if (kind === 'repMember') {
+    $('#pickerTitle').textContent = L('pickMember');
+    body.innerHTML = `<div class="picker-grid">` +
+      [['all', L('bothSum')], ['p1', db.members.p1], ['p2', db.members.p2]].map(([v, label]) =>
+        `<button class="chip ${repMember === v ? 'active' : ''}" data-val="${v}">${v === 'all' ? '👫' : '👤'} ${esc(label)}</button>`).join('') + `</div>`;
   } else {
     const titles = { member: form.type === 'income' ? L('whoReceivedQ') : L('whoPaidQ'), from: L('fromWho'), to: L('toWho'), feePayer: L('feeWho') };
     const curMap = { member: form.payer, from: form.from, to: form.to, feePayer: form.feePayer };
@@ -1030,9 +1035,8 @@ function renderReports() {
   $('#repPrev').style.visibility = navVisible ? 'visible' : 'hidden';
   $('#repNext').style.visibility = navVisible ? 'visible' : 'hidden';
 
-  // 成員篩選列（兩人合計／各成員）
-  $('#repMemberWrap').innerHTML = [['all', L('bothSum')], ['p1', db.members.p1], ['p2', db.members.p2]]
-    .map(([v, label]) => `<button class="seg-btn ${repMember === v ? 'active' : ''}" data-member="${v}">${esc(label)}</button>`).join('');
+  // 右上角成員選擇按鈕（顯示目前選項）
+  $('#repMemberBtn').innerHTML = `${esc(repMember === 'all' ? L('bothSum') : db.members[repMember])} <span class="caret">▾</span>`;
 
   const kindLabel = L(repKind);
   const txs = repKindTxs();
@@ -1692,6 +1696,7 @@ function bind() {
     else if (kind === 'from') { form.from = val; if (form.to === val) form.to = val === 'p1' ? 'p2' : 'p1'; }
     else if (kind === 'to') { form.to = val; if (form.from === val) form.from = val === 'p1' ? 'p2' : 'p1'; }
     else if (kind === 'feePayer') form.feePayer = val;
+    else if (kind === 'repMember') { repMember = val; renderReports(); }
     else if (kind === 'lang') {
       db.lang = val;
       save();
@@ -1996,11 +2001,7 @@ function bind() {
     repKind = b.dataset.kind;
     renderReports();
   });
-  $('#repMemberWrap').addEventListener('click', (e) => {
-    const b = e.target.closest('.seg-btn'); if (!b) return;
-    repMember = b.dataset.member;
-    renderReports();
-  });
+  $('#repMemberBtn').addEventListener('click', () => openPicker('repMember'));
   $('#repBody').addEventListener('click', (e) => {
     const col = e.target.closest('.trend-col[data-m]');
     if (col) {
