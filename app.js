@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v30';
+const APP_VER = 'v31';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -1035,8 +1035,8 @@ function renderReports() {
   $('#repPrev').style.visibility = navVisible ? 'visible' : 'hidden';
   $('#repNext').style.visibility = navVisible ? 'visible' : 'hidden';
 
-  // 右上角成員選擇按鈕（顯示目前選項）
-  $('#repMemberBtn').innerHTML = `${esc(repMember === 'all' ? L('bothSum') : db.members[repMember])} <span class="caret">▾</span>`;
+  // 右上角成員選擇按鈕（顯示目前選項；長名自動換行縮字）
+  $('#repMemberBtn').innerHTML = `<span class="lbl">${esc(repMember === 'all' ? L('bothSum') : db.members[repMember])}</span><span class="caret">▾</span>`;
 
   const kindLabel = L(repKind);
   const txs = repKindTxs();
