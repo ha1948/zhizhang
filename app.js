@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v31';
+const APP_VER = 'v32';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -1035,8 +1035,14 @@ function renderReports() {
   $('#repPrev').style.visibility = navVisible ? 'visible' : 'hidden';
   $('#repNext').style.visibility = navVisible ? 'visible' : 'hidden';
 
-  // 右上角成員選擇按鈕（顯示目前選項；長名自動換行縮字）
-  $('#repMemberBtn').innerHTML = `<span class="lbl">${esc(repMember === 'all' ? L('bothSum') : db.members[repMember])}</span><span class="caret">▾</span>`;
+  // 右上角成員選擇按鈕：純文字，長名固定從中間斷行（兩人/合計、Hay/ward）
+  const memLabel = repMember === 'all' ? L('bothSum') : db.members[repMember];
+  const isCjk = /[㐀-鿿]/.test(memLabel);
+  const oneLineMax = isCjk ? 3 : 5;
+  const cut = Math.floor(memLabel.length / 2);
+  $('#repMemberBtn').innerHTML = `<span class="lbl">${memLabel.length <= oneLineMax
+    ? esc(memLabel)
+    : esc(memLabel.slice(0, cut)) + '<br>' + esc(memLabel.slice(cut))}</span>`;
 
   const kindLabel = L(repKind);
   const txs = repKindTxs();
