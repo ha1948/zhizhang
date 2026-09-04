@@ -1,7 +1,7 @@
 /* ================= 智賬 ================= */
 'use strict';
 
-const APP_VER = 'v28';
+const APP_VER = 'v29';
 const LS_KEY = 'zhizhang.v1';
 
 const DEFAULT_CATS = {
@@ -37,7 +37,7 @@ const STR = {
     searchPh: '搜尋類別、備註、成員⋯', searchHint: '輸入關鍵字搜尋全部歷史記錄',
     searchFound: '找到 {n} 筆', searchNone: '沒有符合「{q}」的記錄',
     accountsTitle: '成員結算', allTime: '累計統計', monthStats: '月份統計',
-    totalSpent: '總花費', subtotal: '合計',
+    totalSpent: '總花費', subtotal: '合計', bothSum: '兩人合計',
     needPay: '{a} 需要給 {b}', allClear: '✓ 目前互不相欠', keepGoing: '繼續好好記帳吧',
     settle: '結清', settleDone: '已結清：{a} 轉給 {b} {amt}',
     accountsHint: '按「結清」會自動新增一筆今天的轉帳記錄',
@@ -111,7 +111,7 @@ const STR = {
     searchPh: 'Search category, note, member…', searchHint: 'Type keywords to search all history',
     searchFound: '{n} results', searchNone: 'No records match "{q}"',
     accountsTitle: 'Settlement', allTime: 'All-time', monthStats: 'Monthly stats',
-    totalSpent: 'Total spent', subtotal: 'Total',
+    totalSpent: 'Total spent', subtotal: 'Total', bothSum: 'Combined',
     needPay: '{a} owes {b}', allClear: '✓ All settled', keepGoing: 'Keep up the good bookkeeping',
     settle: 'Settle up', settleDone: 'Settled: {a} → {b} {amt}',
     accountsHint: '"Settle up" adds a transfer record dated today.',
@@ -981,7 +981,17 @@ let repMonth = thisMonth();
 let repYear = thisMonth().slice(0, 4);
 let repRange = null;
 let repKind = 'expense';
+let repMember = 'all'; // all | p1 | p2
 let repDetailKey = null;
+
+/* 依成員篩選時，每筆記錄計入的金額：
+   支出＝該成員應負擔的分攤、收入＝該成員收到的、轉帳＝該成員轉出的 */
+function repAmtOf(t) {
+  if (repMember === 'all') return t.amount;
+  if (t.type === 'expense') return (t.split && t.split[repMember]) || 0;
+  if (t.type === 'income') return t.payer === repMember ? t.amount : 0;
+  return t.from === repMember ? t.amount : 0;
+}
 
 function periodFilter() {
   if (repPeriod === 'month') {
@@ -1009,7 +1019,7 @@ function periodDays() {
 }
 
 const repKindTxs = () => periodTxs().filter((t) =>
-  repKind === 'transfer' ? (t.type === 'transfer' && !t.legacy) : t.type === repKind);
+  (repKind === 'transfer' ? (t.type === 'transfer' && !t.legacy) : t.type === repKind) && repAmtOf(t) > 0);
 const repKeyOf = (t) => repKind === 'transfer' ? L('transferOut', { name: db.members[t.from] }) : catOf(t).name;
 
 function renderReports() {
@@ -1020,13 +1030,17 @@ function renderReports() {
   $('#repPrev').style.visibility = navVisible ? 'visible' : 'hidden';
   $('#repNext').style.visibility = navVisible ? 'visible' : 'hidden';
 
+  // 成員篩選列（兩人合計／各成員）
+  $('#repMemberWrap').innerHTML = [['all', L('bothSum')], ['p1', db.members.p1], ['p2', db.members.p2]]
+    .map(([v, label]) => `<button class="seg-btn ${repMember === v ? 'active' : ''}" data-member="${v}">${esc(label)}</button>`).join('');
+
   const kindLabel = L(repKind);
   const txs = repKindTxs();
-  const total = txs.reduce((s, t) => s + t.amount, 0);
+  const total = txs.reduce((s, t) => s + repAmtOf(t), 0);
   const byKey = {};
   txs.forEach((t) => {
     const key = repKeyOf(t);
-    byKey[key] = (byKey[key] || 0) + t.amount;
+    byKey[key] = (byKey[key] || 0) + repAmtOf(t);
   });
   const rows = Object.entries(byKey).sort((a, b) => b[1] - a[1]);
 
@@ -1064,7 +1078,7 @@ function renderReports() {
   if (repPeriod === 'year') {
     const monthly = Array.from({ length: 12 }, (_, i) => {
       const ym = `${repYear}-${String(i + 1).padStart(2, '0')}`;
-      return txs.filter((t) => t.date.startsWith(ym)).reduce((s, t) => s + t.amount, 0);
+      return txs.filter((t) => t.date.startsWith(ym)).reduce((s, t) => s + repAmtOf(t), 0);
     });
     const maxM = Math.max(...monthly, 1);
     trendHTML = `
@@ -1110,7 +1124,7 @@ function closeRepDetail() {
 function renderRepDetail() {
   if (repDetailKey == null) return;
   const txs = repKindTxs().filter((t) => repKeyOf(t) === repDetailKey).sort(txSort);
-  const total = txs.reduce((s, t) => s + t.amount, 0);
+  const total = txs.reduce((s, t) => s + repAmtOf(t), 0);
   $('#repDetailTitle').textContent = repDetailKey;
   $('#repDetailSummary').innerHTML = `
     <div>${esc(periodFilter().label)}</div>
@@ -1980,6 +1994,11 @@ function bind() {
   $('#repIOWrap').addEventListener('click', (e) => {
     const b = e.target.closest('.seg-btn'); if (!b) return;
     repKind = b.dataset.kind;
+    renderReports();
+  });
+  $('#repMemberWrap').addEventListener('click', (e) => {
+    const b = e.target.closest('.seg-btn'); if (!b) return;
+    repMember = b.dataset.member;
     renderReports();
   });
   $('#repBody').addEventListener('click', (e) => {
